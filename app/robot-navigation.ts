@@ -21,6 +21,22 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
  const kitchen=kitchens[0]??null;
  const restroom=candidates.find(c=>!kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<4))??null;
  function trace(start:Point,last:number,parents:Map<number,number>,first:number){if(!parents.has(last))return[];const route:Point[]=[];let n=last;while(n!==first){route.push(valid.get(n)!);n=parents.get(n)!;}const anchor=valid.get(first)!;if(!swept(start,anchor))return[];if(Math.hypot(anchor.x-start.x,anchor.z-start.z)>.001)route.push(anchor);return route.reverse();}
- return{goals,services,kitchen,kitchens,restroom,reachable:(p:Point,tolerance=.22)=>available.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<=tolerance),route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked);return trace(start,id(target),parents,first);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?trace(start,target.key,parents,first):[];},canMove:(p:Point)=>canWalk(p.x,p.z,obs,outline,.3)};
+ // Round grid corners into sampled quadratic arcs; validate the entire swept disc.
+ // Keep the original corner when an aisle is too tight for a safe curve.
+ function smooth(start:Point,path:Point[],blocked:Point[]){
+  if(!path.length)return path;
+  const points=[start,...path],turns:Point[]=[start];
+  for(let n=1;n<points.length-1;n++){const a=points[n-1],b=points[n],c=points[n+1];if(Math.abs((b.x-a.x)*(c.z-b.z)-(b.z-a.z)*(c.x-b.x))>.000001)turns.push(b);}
+  turns.push(points[points.length-1]);const result:Point[]=[];let cursor=start;
+  const line=(to:Point)=>{const from=cursor,count=Math.max(1,Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)/.06));for(let n=1;n<=count;n++)result.push({x:from.x+(to.x-from.x)*n/count,z:from.z+(to.z-from.z)*n/count});cursor=to;};
+  for(let n=1;n<turns.length-1;n++){
+   const a=turns[n-1],b=turns[n],c=turns[n+1],ab=Math.hypot(b.x-a.x,b.z-a.z),bc=Math.hypot(c.x-b.x,c.z-b.z),trim=Math.min(.5,ab*.45,bc*.45);
+   const entry={x:b.x+(a.x-b.x)*trim/ab,z:b.z+(a.z-b.z)*trim/ab},exit={x:b.x+(c.x-b.x)*trim/bc,z:b.z+(c.z-b.z)*trim/bc};
+   const arc:Point[]=[];for(let k=0;k<=24;k++){const t=k/24,u=1-t;arc.push({x:u*u*entry.x+2*u*t*b.x+t*t*exit.x,z:u*u*entry.z+2*u*t*b.z+t*t*exit.z});}
+   if(arc.every((p,n)=>canWalk(p.x,p.z,obs,outline,.3)&&(n===0||swept(arc[n-1],p))&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>=.60))){line(entry);for(const p of arc.slice(1))line(p);}else line(b);
+  }
+  line(turns[turns.length-1]);return result;
+ }
+ return{goals,services,kitchen,kitchens,restroom,reachable:(p:Point,tolerance=.22)=>available.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<=tolerance),route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked);return smooth(start,trace(start,id(target),parents,first),blocked);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?smooth(start,trace(start,target.key,parents,first),blocked):[];},canMove:(p:Point)=>canWalk(p.x,p.z,obs,outline,.3)};
 }
 

@@ -30,3 +30,9 @@ const editable=[{id:'a',kind:'table',x:0,z:0,rotation:0},{id:'b',kind:'partition
 const selected=selectInBox(editable,{x:2,z:2},{x:-1,z:-1});assert.deepEqual(selected,['a','b']);assert.deepEqual(deleteSelection(editable,selected).map(i=>i.id),['c']);assert.equal(editable.length,3);
 const warmed=createFleet(initial.items,initial.outline,24);assert(warmed.states().some(r=>Math.hypot(r.x-initial.items.find(i=>i.id===r.id).x,r.z-initial.items.find(i=>i.id===r.id).z)>.5));assert.equal(warmed.drainEvents().length,0);
 console.log('PASS: reverse-direction rectangular selection, batch removal preserves source, warm-started fleet.');
+
+// An open right-angle route must bend continuously, rather than stop at a grid corner.
+const curveNav=createNavigator([],m.DEFAULT_OUTLINE,{x:-3,z:3});
+const curve=[{x:-3,z:3},...curveNav.route({x:-3,z:3},{x:3,z:-3})];let diagonals=0,previousHeading=null,maxBend=0;
+for(let n=1;n<curve.length;n++){const a=curve[n-1],b=curve[n],dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)<.000001)continue;if(Math.abs(dx)>.0001&&Math.abs(dz)>.0001)diagonals++;const heading=Math.atan2(dz,dx);if(previousHeading!==null)maxBend=Math.max(maxBend,Math.abs(Math.atan2(Math.sin(heading-previousHeading),Math.cos(heading-previousHeading))));previousHeading=heading;assert(curveNav.canMove(b));}
+assert(diagonals>10);assert(maxBend<.15,`sharp bend ${maxBend}`);console.log('PASS: rounded right-angle route, intermediate diagonal positions, continuous path tangent.');

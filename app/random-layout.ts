@@ -34,7 +34,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
  // Each seating zone is a short aligned run. The open side is reserved for guests.
- const cap=Math.min(24,Math.max(4,Math.floor(area(outline)/15)));
+ const cap=Math.min(32,Math.max(4,Math.floor(area(outline)/10.5)));
  const guestSide=(seat:Item,side:number)=>{const a=seat.rotation*Math.PI/180,d=CATALOG[seat.kind].w/2+.48;return{x:seat.x+Math.cos(a)*d*side,z:seat.z+Math.sin(a)*d*side,w:.8,d:CATALOG[seat.kind].d,rotation:seat.rotation};};
  function seat(kind:'two'|'four',x:number,z:number,rotation:number,side:number){
   if(items.filter(i=>i.kind==='two'||i.kind==='four').length>=cap)return false;
@@ -47,20 +47,54 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   guestAisles.push(aisle);return true;
  }
  const walls=edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.length>4).sort((a,b)=>b.length-a.length);
+ const wallPhase=Math.floor(random()*3);if(random()<.5)walls.reverse();
  // Keep a consistent furniture type per run, with a cross aisle between each pair of booths.
  for(const [wallIndex,e] of walls.entries()){
-  const rotation=(e.angle+90+360)%360,kind=wallIndex%3===1?'two':'four',pitch=kind==='four'?2.22:2.65;
+  const rotation=(e.angle+90+360)%360,kind=(wallIndex+wallPhase)%3===1?'two':'four',pitch=kind==='four'?2.22:2.65;
   const offset=CATALOG[kind].w/2+.12;
   for(let n=0,t=1.35+Math.floor(random()*3)*.25;t<e.length-1.35;n++,t+=pitch+(kind==='four'&&n%2===1?1.3:0))seat(kind,e.a.x+e.tx*t+e.nx*offset,e.a.z+e.tz*t+e.nz*offset,rotation,1);
  }
- // Only large open bays receive one central, aligned pair. Never fill every remaining gap.
- for(let z=minZ+3.55+Math.floor(random()*3)*.25;z<maxZ-3;z+=5.74){
-  const cuts=edges(outline).filter(e=>(e.a.z>z)!==(e.b.z>z)).map(e=>e.a.x+(z-e.a.z)*(e.b.x-e.a.x)/(e.b.z-e.a.z)).sort((a,b)=>a-b);
-  for(let j=0;j+1<cuts.length;j+=2){if(cuts[j+1]-cuts[j]<10)continue;const x=(cuts[j]+cuts[j+1])/2;
-   const count=items.length,aisleCount=guestAisles.length;
-   if(!seat('four',x,z,0,1)||!seat('four',x,z+2.22,0,1)){items.splice(count);guestAisles.splice(aisleCount);}
+ // Furnished islands form short internal walls. Their exposed sides remain guest aisles.
+ // Try complete modules atomically, so a failed row cannot leave a stray partition behind.
+ type ZoneKind='four'|'two';
+ function island(x:number,z:number,rotation:number,left:ZoneKind|null,right:ZoneKind|null,corner:boolean){
+  const count=(left?2:0)+(right?2:0);
+  if(items.filter(i=>i.kind==='four'||i.kind==='two').length+count>cap)return false;
+  const rad=rotation*Math.PI/180,c=Math.cos(rad),sn=Math.sin(rad),zone:Item[]=[],aisles:ReturnType<typeof bounds>[]=[];
+  const local=(kind:Kind,u:number,v:number,turn=0):Item=>({id:`island-${serial}-${zone.length}`,kind,x:x+c*u-sn*v,z:z+sn*u+c*v,rotation:(rotation+turn)%360});
+  for(const v of[-1.8,0,1.8])zone.push(local('partition',0,v,90));
+  for(const [kind,side] of[[left,-1],[right,1]] as const){if(!kind)continue;
+   const offset=CATALOG[kind].w/2+.08,pitch=kind==='four'?2.22:2.5;
+   for(const v of[-pitch/2,pitch/2]){const i=local(kind,offset*side,v);zone.push(i);aisles.push(guestSide(i,side));}
   }
+  // A return at one end makes an L, leaving the other end and the long access side open.
+  if(corner){const side=right?1:-1;zone.push(local('partition',side*.918,2.718));}
+  const entryClear={x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle};
+  const existing=items.filter(i=>!isArt(i.kind));
+  for(let n=0;n<zone.length;n++){const i=zone[n];
+   if(placementError(i,[...items,...zone.slice(0,n)],outline)||reserved.some(r=>intersects(bounds(i),r))||intersects(bounds(i),entryClear)||guestAisles.some(r=>intersects(bounds(i),r)))return false;
+   if(existing.some(o=>['checkout','drinkbar'].includes(o.kind)&&intersects(bounds(i),{x:o.x-Math.sin(o.rotation*Math.PI/180)*.9,z:o.z+Math.cos(o.rotation*Math.PI/180)*.9,w:CATALOG[o.kind].w,d:1.1,rotation:o.rotation})))return false;
+  }
+  if(aisles.some(r=>!rectInRoom(r,outline,.1)||[...existing,...zone].some(i=>intersects(r,bounds(i)))))return false;
+  const next=[...items,...zone],nav=createNavigator(next,outline,spawnPoint(outline,next));
+  if(!next.filter(i=>i.kind==='two'||i.kind==='four').every(i=>customerSeatAccess(i,nav)))return false;
+  items.push(...zone);guestAisles.push(...aisles);serial++;return true;
  }
+ // Search the whole floor, not just its centre line. A random offset and module palette
+ // change the floor plan itself; distance scoring gives the largest usable gaps priority.
+ const zoneCandidates:{x:number;z:number;rotation:number;score:number}[]=[];
+ const ox=random(),oz=random(),preferred=random()<.5?0:90;
+ for(let z=minZ+2+oz;z<maxZ-2;z+=.9)for(let x=minX+2+ox;x<maxX-2;x+=.9){
+  if(!rectInRoom({x,z,w:1,d:1,rotation:0},outline,.1))continue;
+  const distance=Math.min(...items.filter(i=>!isArt(i.kind)).map(i=>Math.hypot(x-i.x,z-i.z)));
+  for(const rotation of[preferred,90-preferred])zoneCandidates.push({x,z,rotation,score:distance+random()*.9+(rotation===preferred?.4:0)});
+ }
+ zoneCandidates.sort((a,b)=>b.score-a.score);
+ const palettes:[ZoneKind|null,ZoneKind|null][] = random()<.5?[['four','four'],['two','four'],['four',null],[null,'two']]:[['four','two'],['four','four'],[null,'four'],['two',null]];
+ const corner=random()<.65;let islands=0;
+ for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/90)))break;
+  if(island(p.x,p.z,p.rotation,left,right,corner)){islands++;}
+ }}
  const spawn=spawnPoint(outline,items);
  // Recheck both bench/chair approaches from the entrance, not just a point near the table.
  const access=createNavigator(items,outline,spawn);
@@ -70,7 +104,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const nav=createNavigator(items,outline,spawn);
  for(let z=maxZ-2;z>minZ+1&&items.filter(i=>i.kind==='robot').length<3;z-=1)for(let x=minX+1;x<maxX-1;x+=1){if(items.filter(i=>i.kind==='robot').length>=3)break;if(nav.route(spawn,{x,z}).length)add('robot',x,z);}
  // Screens only mark the END of a seating run, never its access side.
- let screens=0;for(const i of items.filter(i=>i.kind==='four')){if(screens>=2)break;const a=i.rotation*Math.PI/180;
+ let screens=items.filter(i=>i.kind==='partition').length;for(const i of items.filter(i=>i.kind==='four')){if(screens>=2)break;const a=i.rotation*Math.PI/180;
   for(const sign of[-1,1]){const candidate:Item={id:`random-${serial++}`,kind:'partition',x:i.x-Math.sin(a)*1.25*sign,z:i.z+Math.cos(a)*1.25*sign,rotation:i.rotation};
    if(guestAisles.some(r=>intersects(bounds(candidate),r))||reserved.some(r=>intersects(bounds(candidate),r))||placementError(candidate,items,outline))continue;
    const next=[...items,candidate],check=createNavigator(next,outline,spawn);

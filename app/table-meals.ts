@@ -1,10 +1,12 @@
 import * as T from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+export const MENU_COUNT=12;
 
 // Stylized, fully 3D servings based on the official popular-menu photographs.
 export function createTableMeal(index:number,width:number,mode:'table'|'cargo'|'plates'='table'):T.Group {
  const root=new T.Group();root.name='料理・マグナム・取り皿';root.userData.textures=[];
  let seed=73+index*193;const random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646;};
- const material=(color:string,roughness=.6)=>new T.MeshStandardMaterial({color,roughness});
+ const materials=new Map<string,T.MeshStandardMaterial>();const material=(color:string,roughness=.6)=>{const key=color+roughness;let m=materials.get(key);if(!m){m=new T.MeshStandardMaterial({color,roughness});materials.set(key,m);}return m;};
  const china=material('#f8f4df',.25),crust=material('#c98d37'),cheese=material('#efcf7c'),sauce=material('#a64120'),herb=material('#497634');
  function mesh(geo:T.BufferGeometry,mat:T.Material,parent:T.Object3D,x=0,y=0,z=0){const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
  function disc(r:number,h:number,mat:T.Material,p:T.Object3D,x=0,y=0,z=0){return mesh(new T.CylinderGeometry(r,r,h,40),mat,p,x,y,z);}
@@ -24,7 +26,7 @@ export function createTableMeal(index:number,width:number,mode:'table'|'cargo'|'
   const profile=[[0,.01],[r*.82,.01],[r,.022],[r,.039],[r*.92,.043],[r*.82,.019],[0,.019]].map(([x,y])=>new T.Vector2(x,y));const tray=mesh(new T.LatheGeometry(profile,48),brown,p);tray.scale.z=.76;
   for(const sign of[-1,1])blob(sign*r,.027,0,r*.15,.007,r*.15,brown,p);
  }
- function dish(kind:number,x:number,z:number){const p=new T.Group();p.position.set(x,0,z);root.add(p);p.name=['ミラノ風ドリア','マルゲリータ','辛味チキン','小エビのサラダ','ペペロンチーノ','イタリアンプリン','青豆の温サラダ','ハンバーグ'][kind%8];
+ function dish(kind:number,x:number,z:number){const p=new T.Group();p.position.set(x,0,z);root.add(p);p.name=['ミラノ風ドリア','マルゲリータ','辛味チキン','小エビのサラダ','ペペロンチーノ','イタリアンプリン','青豆の温サラダ','ハンバーグ','ティラミス クラシコ','チョコレートケーキ','ミルクジェラート','プリンとティラミス'][kind%MENU_COUNT];
   if(kind===0){ // Oval ceramic gratin dish, cream sauce and central meat sauce.
    hotPlate(p,.13);
    const filling=disc(.109,.022,cheese,p,0,.025);filling.scale.z=.74;
@@ -45,15 +47,27 @@ export function createTableMeal(index:number,width:number,mode:'table'|'cargo'|'
   else if(kind===4){plate(p,.13,0,0,'mosaic');for(let n=0;n<24;n++){const points=[];for(let k=0;k<15;k++){const a=k*.6+n,rr=.025+(n%5)*.014;points.push(new T.Vector3(Math.cos(a)*rr,.02+n*.0008+Math.sin(k)*.003,Math.sin(a)*rr));}mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),22,.002,4,false),cheese,p);}for(let i=0;i<8;i++)blob((random()-.5)*.12,.05,(random()-.5)*.12,.004,.002,.007,sauce,p);}
   else if(kind===5){plate(p,.095,0,0);disc(.052,.003,sauce,p,0,.014);mesh(new T.CylinderGeometry(.039,.05,.045,32),material('#efc66b',.3),p,0,.037);disc(.039,.003,material('#884622',.25),p,0,.061);}
   else if(kind===6){plate(p,.112,0,0);for(let n=0;n<65;n++){const a=n*2.4,r=Math.sqrt(random())*.085;blob(Math.cos(a)*r,.02+random()*.012,Math.sin(a)*r,.006,.006,.006,herb,p);}blob(0,.045,0,.033,.018,.028,china,p);blob(0,.057,0,.014,.006,.014,material('#e7ad2b'),p);}
-  else {hotPlate(p,.13,index%2===0);blob(-.015,.04,0,.075,.023,.05,material('#644026'),p);blob(-.015,.061,0,.065,.003,.042,sauce,p);for(let i=0;i<6;i++)blob(.08,.023,(i-3)*.018,.022,.012,.007,cheese,p);}
-
+  else if(kind===7){hotPlate(p,.13,index%2===0);blob(-.015,.04,0,.075,.023,.05,material('#644026'),p);blob(-.015,.061,0,.065,.003,.042,sauce,p);for(let i=0;i<6;i++)blob(.08,.023,(i-3)*.018,.022,.012,.007,cheese,p);}
+  else {
+   plate(p,.112,0,0,'plain');const cocoa=material('#68412e',.8),cream=material('#f2dfaf',.45),chocolate=material('#452b20',.48);
+   const layer=(w:number,h:number,d:number,y:number,m:T.Material,x=0)=>mesh(new T.BoxGeometry(w,h,d),m,p,x,y,0);
+   if(kind===8||kind===11){const x=kind===11?-.044:0,scale=kind===11?.65:1;layer(.11*scale,.012,.085*scale,.025,cocoa,x);layer(.11*scale,.017,.085*scale,.039,cream,x);layer(.11*scale,.008,.085*scale,.051,cocoa,x);layer(.11*scale,.023,.085*scale,.066,cream,x);layer(.11*scale,.002,.085*scale,.079,cocoa,x);}
+   if(kind===9){const wedge=new T.Shape();wedge.moveTo(-.07,-.045);wedge.lineTo(.07,-.045);wedge.lineTo(.045,.06);wedge.lineTo(-.07,-.045);const geo=new T.ExtrudeGeometry(wedge,{depth:.045,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.002,bevelThickness:.002});geo.rotateX(-Math.PI/2);mesh(geo,chocolate,p,0,.02,0);for(let n=0;n<18;n++)blob((random()-.5)*.06,.07,(random()-.5)*.04,.002,.001,.002,cocoa,p);}
+   if(kind===10){for(const x of[-.023,.023])blob(x,.046,0,.035,.032,.04,material('#fff5d9',.35),p);}
+   if(kind===11){disc(.036,.003,material('#884622',.25),p,.047,.015);mesh(new T.CylinderGeometry(.025,.033,.036,24),cheese,p,.047,.035);disc(.025,.003,cocoa,p,.047,.054);}
+  }
+  // Batch tiny food details by material, preserving each plate as a movable component.
+  p.updateMatrixWorld(true);const inverse=p.matrixWorld.clone().invert(),batches=new Map<T.Material,T.BufferGeometry[]>(),old:T.Mesh[]=[];
+  p.traverse(o=>{if(o instanceof T.Mesh&&!Array.isArray(o.material)){const geo=o.geometry.clone().applyMatrix4(inverse.clone().multiply(o.matrixWorld));const list=batches.get(o.material)??[];list.push(geo);batches.set(o.material,list);old.push(o);}});
+  for(const o of old){o.removeFromParent();o.geometry.dispose();}
+  for(const [m,geos] of batches){const merged=mergeGeometries(geos);if(merged)mesh(merged,m,p);for(const g of geos)g.dispose();}
  }
 
- if(mode==='cargo'){dish(index%8,0,0);return root;}
+ if(mode==='cargo'){dish(index%MENU_COUNT,0,0);return root;}
  if(mode==='plates'){for(let n=0;n<3;n++){const p=plate(root,.11,0,0);p.position.y=n*.012;}return root;}
  const large=width>1;
- if(large){[[-.43,.1],[-.1,.1],[.23,.1],[0,-.21],[.32,-.21]].forEach(([x,z],n)=>dish((index+n)%8,x,z));}
- else {dish(index%8,-.2,.09);dish((index+3)%8,.1,.1);root.children[1].scale.setScalar(.78);}
+ if(large){[[-.43,.1],[-.1,.1],[.23,.1],[0,-.21],[.32,-.21]].forEach(([x,z],n)=>dish((index+n)%MENU_COUNT,x,z));}
+ else {dish(index%MENU_COUNT,-.2,.09);dish((index+3)%MENU_COUNT,.1,.1);root.children[1].scale.setScalar(.78);}
  const right=width/2-.115;
  for(let n=0;n<(large?4:2);n++){const p=plate(root,.068,right,.265);p.position.y=n*.009;}
  const glassMat=new T.MeshPhysicalMaterial({color:'#e3ece7',roughness:.12,transparent:true,opacity:.24,side:T.DoubleSide,depthWrite:false});

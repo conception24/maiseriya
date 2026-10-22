@@ -2,7 +2,7 @@ import {createNavigator} from './robot-navigation';
 import {spawnPoint,type Item,type Point} from './floor-plan';
 export type RobotState=Point&{id:string;number:number;status:string;yaw:number;hidden:boolean;phase:string;cargo:'food'|'plates'|'empty';variant:number;tableId:string};
 export type ServiceEvent={type:'delivered'|'collected';tableId:string;variant:number};
-export function createFleet(items:Item[],outline:Point[]){
+export function createFleet(items:Item[],outline:Point[],warmStartSeconds=0){
  const placed=items.filter(i=>i.kind==='robot'),first=placed[0],shared=createNavigator(items,outline,first??spawnPoint(outline,items)),kitchen=shared.kitchen,kitchens=shared.kitchens,portals=kitchens.map(()=>({owner:""}));
  type Phase='outbound'|'service'|'return'|'enter'|'hidden'|'exit';
  const robots=placed.map((i,index)=>({kitchen:kitchens[index%kitchens.length]??null,portal:portals[index%portals.length]??{owner:""},id:i.id,number:index+1,x:i.x,z:i.z,yaw:-i.rotation*Math.PI/180,status:'出発準備中',nav:shared,path:[] as Point[],wait:index*.4,blocked:0,idle:0,lastX:i.x,lastZ:i.z,yielding:false,goalIndex:index,target:{x:i.x,z:i.z},home:{x:i.x,z:i.z},phase:'outbound' as Phase,hidden:false,cargo:'food' as RobotState['cargo'],variant:index,tableId:'',collect:false}));
@@ -20,7 +20,7 @@ export function createFleet(items:Item[],outline:Point[]){
   r.x=next.x;r.z=next.z;return d<=step+.00001;
  }
 
- return{ kitchen,kitchens,restroom:shared.restroom,drainEvents(){return events.splice(0);},states:():RobotState[]=>robots.map(({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})=>({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})),step(dt:number,person:Point,paused:boolean){
+ const fleet={ kitchen,kitchens,restroom:shared.restroom,drainEvents(){return events.splice(0);},states:():RobotState[]=>robots.map(({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})=>({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})),step(dt:number,person:Point,paused:boolean){
   for(const r of robots){const kitchen=r.kitchen;const others=robots.filter(o=>o!==r&&!o.hidden);
    if(paused){r.status='一時停止中';continue;}
    r.idle=Math.hypot(r.x-r.lastX,r.z-r.lastZ)>.001||r.hidden?0:r.idle+dt;r.lastX=r.x;r.lastZ=r.z;
@@ -57,4 +57,7 @@ export function createFleet(items:Item[],outline:Point[]){
    }else r.blocked=0;
   }
  }};
+ // Advance the same collision-safe simulation before showing the room.
+ for(let t=0;t<warmStartSeconds;t+=1/30)fleet.step(1/30,{x:0,z:0},false);
+ fleet.drainEvents();return fleet;
 }

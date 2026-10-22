@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {rackSide} from './table-arrangement';
 import {createTableMeal} from './table-meals';
 import { colliders, canWalk, DEFAULT_OUTLINE,edges,entrance,inside,spawnPoint,isArt,CATALOG,type Layout,type Point,type Item } from './floor-plan';
 import {ARTWORKS} from './artworks';
@@ -38,14 +39,14 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const lamps:T.PointLight[]=[];
  for(let x=-12;x<=12;x+=3.8)for(let z=-13;z<=12;z+=4){if(!canWalk(x,z,[],outline,.6))continue;cyl(.012,.012,.48,x,2.98,z,metal);cyl(.1,.34,.25,x,2.61,z,mat('#e9d6a2'));cyl(.28,.28,.012,x,2.48,z,new T.MeshStandardMaterial({color:'#fff0bd',emissive:'#ffdf91',emissiveIntensity:1.8}));const l=new T.PointLight('#ffe2a4',9,7,2);l.position.set(x,2.4,z);scene.add(l);lamps.push(l);}
  const hemi=new T.HemisphereLight('#e9f2e8','#927455',2);scene.add(hemi);const sun=new T.DirectionalLight('#fff1cb',3.4);sun.position.set(7,6,3);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:.1,far:30});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;scene.add(sun);
- function table(x:number,z:number,w:number,d:number,parent:T.Object3D=scene){box(w,.065,d,x,.735,z,darkwood,parent,.025);box(w-.018,.035,d-.018,x,.779,z,top,parent,.016);cyl(.028,.033,.64,x,.35,z,metal,parent);box(w*.65,.055,.46,x,.045,z,metal,parent,.02);props(x,z,w,parent);const meal=createTableMeal(meals.length,w);meal.userData.served=true;meal.userData.width=w;meal.userData.tableId=activeTableId;mealByTable.set(activeTableId,meal);meal.position.set(x,.8,z);meal.visible=options.foodEnabled!==false;parent.add(meal);meals.push(meal);textures.push(...meal.userData.textures); }
+ function table(x:number,z:number,w:number,d:number,parent:T.Object3D=scene){box(w,.065,d,x,.735,z,darkwood,parent,.025);box(w-.018,.035,d-.018,x,.779,z,top,parent,.016);cyl(.028,.033,.64,x,.35,z,metal,parent);box(w*.65,.055,.46,x,.045,z,metal,parent,.02);props(x,z,w,parent);const meal=createTableMeal(meals.length,w);meal.userData.served=true;meal.userData.width=w;meal.userData.tableId=activeTableId;mealByTable.set(activeTableId,meal);const side=rackSide(items.find(i=>i.id===activeTableId)!,items,outline);meal.position.set(x-side*.115,.8,z);meal.scale.set((w-.25)/w,1,.9);meal.visible=options.foodEnabled!==false;parent.add(meal);meals.push(meal);textures.push(...meal.userData.textures); }
  const menuTex=new T.TextureLoader().load(menuCover);menuTex.colorSpace=T.SRGBColorSpace;menuTex.anisotropy=renderer.capabilities.getMaxAnisotropy();textures.push(menuTex);const menuMaterial=new T.MeshStandardMaterial({map:menuTex,roughness:.65});
 
  const recommendationTex=texture(c=>{c.fillStyle='#f7f0d3';c.fillRect(0,0,512,512);c.fillStyle='#206640';c.fillRect(0,0,512,105);c.fillStyle='white';c.textAlign='center';c.font='bold 55px sans-serif';c.fillText('おすすめ',256,75);c.fillStyle='#a03031';c.font='bold 64px sans-serif';c.fillText('マグナム',256,200);c.fillStyle='#304737';c.font='47px sans-serif';c.fillText('赤・白 1,500ml',256,280);c.font='35px sans-serif';c.fillText('みんなで楽しむワイン',256,370);});
  const organizer=mat('#c9bd93',.68),tray=mat('#827b64',.65),steel=new T.MeshStandardMaterial({color:'#a4a6a0',metalness:.72,roughness:.32});
  function props(x:number,z:number,w:number,p:T.Object3D){
   const book=new T.Group();book.position.set(x+w*.23,.8,z+.035);book.rotation.y=-.06;book.visible=options.foodEnabled===false;flatMenus.push(book);p.add(book);box(.182,.006,.332,0,0,0,cream,book,.002);const cover=new T.Mesh(new T.PlaneGeometry(.182,.332),menuMaterial);cover.rotation.x=-Math.PI/2;cover.position.y=.0035;cover.receiveShadow=true;book.add(cover);
-  const rack=new T.Group();rack.position.set(x-w*.22,.8,z-.24);p.add(rack);
+  const rack=new T.Group();const item=items.find(i=>i.id===activeTableId)!;const side=rackSide(item,items,outline);rack.position.set(x+side*(w/2-.095),.8,z);rack.rotation.y=-side*Math.PI/2;p.add(rack);
   box(.32,.008,.19,0,.004,0,organizer,rack,.004);
   // Slim case walls and four individually recessed pull-out drawers.
   for(const xx of[-.065,.148])box(.007,.215,.145,xx,.113,0,organizer,rack,.003);
@@ -53,7 +54,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   for(let n=0;n<4;n++){const yy=.018+n*.05;box(.207,.006,.143,.042,yy,0,organizer,rack,.002);box(.192,.033,.126,.042,yy+.021,-.005,tray,rack,.002);box(.195,.012,.008,.042,yy+.011,.067,organizer,rack,.002);box(.035,.006,.018,-.043,yy+.008,.079,organizer,rack,.002);for(let f=0;f<3;f++){rod(new T.Vector3(-.025,yy+.039,-.045+f*.026),new T.Vector3(.09,yy+.039,-.045+f*.026),.002,steel,rack);}}
   box(.08,.15,.105,-.112,.13,-.013,organizer,rack,.004);for(let n=0;n<5;n++)box(.067,.001,.085,-.112,.208+n*.0015,-.014,cream,rack,.001);
   cyl(.032,.035,.012,-.112,.019,.061,cream,rack);cyl(.012,.016,.006,-.112,.028,.061,steel,rack);
-  box(.31,.205,.006,0,.15,-.084,organizer,rack,.003);box(.31,.08,.006,0,.25,-.066,organizer,rack,.003);
+  box(.31,.205,.006,0,.15,-.092,organizer,rack,.003);box(.31,.08,.006,0,.25,-.066,organizer,rack,.003);
   const upright=new T.Group();upright.position.set(.02,.27,-.076);upright.rotation.x=-.035;rack.add(upright);box(.18,.32,.005,0,.04,0,cream,upright,.002);const menu=new T.Mesh(new T.PlaneGeometry(.18,.32),menuMaterial);menu.position.set(0,.04,.003);upright.add(menu);const card=new T.Mesh(new T.PlaneGeometry(.12,.1),mat("#ffffff",.7,recommendationTex));card.position.set(.045,.275,.018);card.rotation.x=-.1;rack.add(card);
  }
  const cane=mat('#d7aa65',.36,woodTex),binding=mat('#29251e',.48),plastic=mat('#85837d',.48);

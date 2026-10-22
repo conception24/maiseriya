@@ -11,7 +11,8 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",
-    "build:standalone": "vite build --config vite.local.config.ts --outDir work/standalone-build && node scripts/package-standalone.mjs"
+    "build:standalone": "vite build --config vite.local.config.ts --outDir work/standalone-build && node scripts/package-standalone.mjs",
+    "test:layout": "node scripts/test-builder.mjs && node scripts/test-random.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

@@ -9,7 +9,7 @@ export function createFleet(items:Item[],outline:Point[]){
  const events:ServiceEvent[]=[];
  function plan(r:typeof robots[number],others:Point[]){const goals=r.nav.services;for(let n=0;n<goals.length;n++){const goal=goals[r.goalIndex++%goals.length];if(robots.some(o=>o!==r&&o.tableId===goal.tableId&&['outbound','service'].includes(o.phase)))continue;const route=r.nav.route(r,goal.point,others);if(route.length||Math.hypot(r.x-goal.point.x,r.z-goal.point.z)<.05){r.tableId=goal.tableId;r.target=goal.point;r.path=route;return true;}}return false;}
  function move(r:typeof robots[number],target:Point,dt:number,others:Point[]){const dx=target.x-r.x,dz=target.z-r.z,d=Math.hypot(dx,dz),step=Math.min(d,.9*dt),next=d?{x:r.x+dx/d*step,z:r.z+dz/d*step}:r;if(others.some(o=>Math.hypot(next.x-o.x,next.z-o.z)<.59))return false;r.x=next.x;r.z=next.z;if(d>.001)r.yaw=Math.atan2(-dx,-dz);return d<=step+.00001;}
- return{ kitchen,kitchens,drainEvents(){return events.splice(0);},states:():RobotState[]=>robots.map(({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})=>({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})),step(dt:number,person:Point,paused:boolean){
+ return{ kitchen,kitchens,restroom:shared.restroom,drainEvents(){return events.splice(0);},states:():RobotState[]=>robots.map(({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})=>({id,number,x,z,yaw,status,hidden,phase,cargo,variant,tableId})),step(dt:number,person:Point,paused:boolean){
   for(const r of robots){const kitchen=r.kitchen;const others=robots.filter(o=>o!==r&&!o.hidden);
    if(paused){r.status='一時停止中';continue;}
    if(r.portal.owner===r.id&&r.phase==='outbound'&&kitchen&&Math.hypot(r.x-kitchen.point.x,r.z-kitchen.point.z)>1.1)r.portal.owner='';

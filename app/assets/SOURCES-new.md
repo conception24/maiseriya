@@ -35,3 +35,6 @@ Additional procedural dishes checked against the official menu on 2026-10-22:
 - https://www.saizeriya.co.jp/menu-popular/2303/ (peperoncino)
 - https://www.saizeriya.co.jp/menu-popular/1425/ (green peas and soft egg)
 Red/white wine glasses, water/juice tumblers and a procedural magnum recommendation card are included. Robot delivery/collection behavior is an app simulation, not a claim about real store operations.
+
+## User-supplied checkout and tableware references (2026-10-22)
+Procedural models were revised using the supplied reference photographs; the photographs themselves are not bundled. Checkout: ivory cash unit, black portrait screen, left barcode scanner / receipt printer, right payment terminal, green counter and Self Checkout sign. Tableware: brown hairline rims; muted mosaic bands; yellow/pink floral salad bowls; brown or black hot dishes on wooden trivets. These are visual approximations, not verified product model specifications.

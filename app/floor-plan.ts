@@ -1,6 +1,6 @@
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo';
+export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside'};
 export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'gray'|'perforated';foodEnabled?:boolean;invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
@@ -21,6 +21,7 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  athens:{name:'アテナイの学堂',description:'ラファエロ / 壁に配置',w:2,d:.12,seats:0},
  logo:{name:'サイゼリヤのロゴ',description:'入口付近の壁用パネル',w:1.35,d:.12,seats:0},
  robot:{name:'配膳ロボット Servi',description:'最大5台。料理を配膳・回収して厨房へ',w:.49,d:.49,seats:0},
+ checkout:{name:'セルフレジ',description:'モニター・現金精算機・バーコード読取機',w:1.3,d:.7,seats:0},
  plant:{name:'観葉植物',description:'通路に緑を添える',w:.65,d:.65,seats:0}
 };
 export const snap=(n:number)=>Math.round(n*4)/4;

@@ -98,6 +98,23 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  // The same item coordinates and rotations drive the 2D plan and the 3D furniture.
 
  // A single 36 mm board with rounded top corners, without decorative infill.
+ // A single static environment shared by all mirror panels; no reflection render passes.
+ let pillarMirror:T.MeshStandardMaterial|undefined;
+ function pillar(g:T.Object3D,mirrored:boolean){
+  box(.82,3.3,.82,0,1.65,0,wall,g);
+  if(!mirrored)return;
+  if(!pillarMirror){
+   const faces=Array.from({length:6},(_,face)=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const c=canvas.getContext('2d')!;
+    const gradient=c.createLinearGradient(0,0,0,64);gradient.addColorStop(0,'#eee5d1');gradient.addColorStop(.4,'#cfc8ad');gradient.addColorStop(.55,'#839782');gradient.addColorStop(.7,'#b79568');gradient.addColorStop(1,'#d9c7a8');c.fillStyle=gradient;c.fillRect(0,0,64,64);
+    if(face<4){c.fillStyle='#f1eddc';c.fillRect(8,7,3,33);c.fillStyle='#b7b19a';c.fillRect(39,6,7,39);}return canvas;});
+   const env=new T.CubeTexture(faces);env.colorSpace=T.SRGBColorSpace;env.needsUpdate=true;textures.push(env);
+   pillarMirror=new T.MeshStandardMaterial({color:'#c4cfca',metalness:.92,roughness:.16,envMap:env,envMapIntensity:.85});
+  }
+  // Box sides cover all four faces, from exactly 1m to 3m above the floor.
+  box(.828,2,.828,0,2,0,pillarMirror,g);
+  for(const y of[1,3])box(.836,.012,.836,0,y,0,metal,g);
+  for(const x of[-.416,.416])for(const z of[-.416,.416])box(.008,2,.008,x,2,z,metal,g);
+ }
  function partition(g:T.Object3D){const shape=new T.Shape();shape.moveTo(-.9,0);shape.lineTo(.9,0);shape.lineTo(.9,1.19);shape.quadraticCurveTo(.9,1.25,.84,1.25);shape.lineTo(-.84,1.25);shape.quadraticCurveTo(-.9,1.25,-.9,1.19);shape.closePath();const geo=new T.ExtrudeGeometry(shape,{depth:.032,bevelEnabled:true,bevelThickness:.002,bevelSize:.002,bevelSegments:2,steps:1,curveSegments:12});geo.translate(0,0,-.016);const panel=new T.Mesh(geo,wood);panel.castShadow=true;panel.receiveShadow=true;g.add(panel);}
  const leafMaterials=['#36592f','#456d36','#527d3b','#63874a'].map(color=>new T.MeshStandardMaterial({color,roughness:.62,side:T.DoubleSide}));
  const stemMaterial=mat('#686044',.9),veinMaterial=mat('#849455',.8);
@@ -172,7 +189,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   const staffTerminal=box(.24,.17,.035,.25,1.18,-.31,black,g,.012);staffTerminal.rotation.x=-.18;box(.19,.115,.006,.25,1.19,-.333,mat('#315b60',.25),g,.004);
   const terminal=box(.18,.04,.23,.51,.94,.12,black,g,.015);terminal.rotation.x=.28;cyl(.045,.05,.02,.51,.92,-.19,ivory,g);
  }
- for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':bench(0,0,0,g);break;case 'partition':partition(g);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
+ for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':bench(0,0,0,g);break;case 'partition':partition(g);break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
 
  // Clamp every table-top component away from room walls, including angled walls.
  scene.updateMatrixWorld(true);

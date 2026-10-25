@@ -126,6 +126,32 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   }
  }
  if(!benchRuns)throw new Error('連続ベンチ席と通路を確保できません。部屋を広げてください。');
+ // Structural columns precede the remaining seating, and leave the planned main routes intact.
+ // Prefer 2.3m wall clearance; narrower wings may use 1.8m, still over 1.3m from the column face.
+ const columnCount=random()<.5?3:4,columnCandidates:{x:number;z:number;score:number}[]=[];
+ const columnOffsetX=random()*.7,columnOffsetZ=random()*.7;
+ for(let z=minZ+1.8+columnOffsetZ;z<maxZ-1.8;z+=.5)for(let x=minX+1.8+columnOffsetX;x<maxX-1.8;x+=.5){
+  const p={x,z};if(clearance(p)<1.8||!rectInRoom({x,z,w:1,d:1,rotation:0},outline,.1))continue;
+  columnCandidates.push({...p,score:random()});
+ }
+ columnCandidates.sort((a,b)=>b.score-a.score);
+ const columns:Item[]=[];
+ for(const pass of[0,1])for(const p of columnCandidates){
+  if(columns.length>=columnCount)break;
+  if(clearance(p)<(pass===0?2.3:1.8))continue;
+  const i:Item={id:`column-${serial++}`,kind:'pillar',x:p.x,z:p.z,rotation:0};
+  const surround={...bounds(i),w:pass===0?1.5:1,d:pass===0?1.5:1};
+  if(columns.some(c=>Math.hypot(c.x-i.x,c.z-i.z)<(pass===0?3.6:2.8))||placementError(i,items,outline)||reserved.some(r=>intersects(surround,r))||guestAisles.some(r=>intersects(surround,r))||Math.hypot(i.x-entry.x,i.z-entry.z)<3.5)continue;
+  if(items.some(o=>intersects(surround,bounds(o))))continue;
+  const next=[...items,i],check=planningNavigator(next,outline,spawnPoint(outline,next));
+  if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(k=>check.reachable(k.point,.35)))continue;
+  if(!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
+  columns.push(i);items.push(i);
+ }
+ if(columns.length<3)throw new Error('柱を3本と通路を確保できません。部屋を広げてください。');
+ // At least one plain column and one mirrored column; the remaining finishes vary.
+ const mirrorCount=Math.max(1,Math.min(columns.length-1,Math.round(columns.length*random()*.75)));
+ columns.forEach((column,n)=>{column.mirror=n<mirrorCount;});
  const wallPhase=Math.floor(random()*3);if(random()<.5)walls.reverse();
  // Keep a consistent furniture type per run, with a cross aisle between each pair of booths.
  for(const [wallIndex,e] of walls.entries()){
@@ -219,8 +245,6 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  for(let n=items.length-1;n>=0;n--){const i=items[n];if(!['four','two'].includes(i.kind))continue;
   if(!customerSeatAccess(i,access))items.splice(n,1);
  }
- const nav=planningNavigator(items,outline,spawn);
- for(let z=maxZ-2;z>minZ+1&&items.filter(i=>i.kind==='robot').length<3;z-=1)for(let x=minX+1;x<maxX-1;x+=1){if(items.filter(i=>i.kind==='robot').length>=3)break;if(nav.route(spawn,{x,z}).length)add('robot',x,z);}
  // Screens only mark the END of a seating run, never its access side.
  let screens=items.filter(i=>i.kind==='partition').length;for(const i of items.filter(i=>i.kind==='four')){if(screens>=Math.min(22,Math.max(10,Math.ceil(area(outline)/9))))break;const a=i.rotation*Math.PI/180;
   for(const sign of[-1,1]){const candidate:Item={id:`random-${serial++}`,kind:'partition',x:i.x-Math.sin(a)*1.25*sign,z:i.z+Math.cos(a)*1.25*sign,rotation:i.rotation};
@@ -229,6 +253,9 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
    if(next.filter(t=>t.kind==='two'||t.kind==='four').every(t=>customerSeatAccess(t,check))&&smallTableGroups(next).every(g=>smallGroupAccess(g,check))){items.push(candidate);screens++;break;}
   }
  }
+ // Choose robot starts after the final screens, from the entrance-connected component.
+ const nav=planningNavigator(items,outline,spawn);
+ for(let z=maxZ-2;z>minZ+1&&items.filter(i=>i.kind==='robot').length<3;z-=1)for(let x=minX+1;x<maxX-1;x+=1){if(items.filter(i=>i.kind==='robot').length>=3)break;if(nav.route(spawn,{x,z}).length)add('robot',x,z);}
  // Door locations ignore artwork, so adding paintings cannot relocate an opening.
  const portals=planningNavigator(items,outline,items.find(i=>i.kind==='robot')??spawn);
  const openings=[...portals.kitchens,...(portals.restroom?[portals.restroom]:[])];

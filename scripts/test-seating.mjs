@@ -59,6 +59,15 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  let calls=0;const roll=shape===16?.99:(shape+.5)*.98/16;
  const outline=randomRoom(()=>[.4,.4,roll,mirror][calls++]);
  const next=randomArrangement({...initialLayout(),outline},random);parseDocument({version:2,...next});
+ const columns=next.items.filter(i=>i.kind==='pillar');assert(columns.length>=3&&columns.length<=4,`column count in shape ${shape}`);
+ assert(columns.some(i=>i.mirror===true)&&columns.some(i=>i.mirror===false),'plain and mirror finishes both occur');
+ assert.equal(CATALOG.pillar.w,CATALOG.table.w);assert.equal(CATALOG.pillar.d,CATALOG.table.w);
+ for(const p of columns){
+  const distance=Math.min(...edges(outline).map(e=>{const t=Math.max(0,Math.min(e.length,(p.x-e.a.x)*e.tx+(p.z-e.a.z)*e.tz));return Math.hypot(p.x-e.a.x-e.tx*t,p.z-e.a.z-e.tz*t);}));
+  assert(distance>=1.8-.001,'columns must not hug the exterior wall');
+  for(const other of next.items.filter(i=>i!==p&&!['robot','venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(i.kind)))assert(!intersects(bounds(p),bounds(other),-.0001),'column overlaps furniture');
+ }
+ const loaded=parseDocument({version:2,...next});assert.deepEqual(loaded.items.filter(i=>i.kind==='pillar'),columns,'mirror finishes survive export/import');
  const benches=next.items.filter(i=>i.kind==='bench');assert(benches.length>=2,`missing continuous bench in shape ${shape}`);
  const runs=new Set(benches.map(i=>i.id.split('-bench-')[0]));totalRuns+=runs.size;
  for(const b of benches){
@@ -74,3 +83,8 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
 }
 assert(totalRuns>=60,'normally include multiple continuous bench runs');
 console.log(`PASS: 17 room families in both mirror directions, wall/partition backed connected benches in every plan (${totalRuns} runs), 2% wide-waisted hourglass.`);
+
+const badPillar={id:'bad-pillar',kind:'pillar',x:0,z:0,rotation:0,mirror:'yes'};
+assert.throws(()=>parseDocument({version:2,outline,items:[badPillar]}));
+assert.throws(()=>parseDocument({version:2,outline,items:[{...badPillar,kind:'chair',mirror:true}]}));
+console.log('PASS: 3–4 collision-safe interior columns in all 34 plans, mixed mirror/plain finishes, table-width dimensions and validated finish persistence.');

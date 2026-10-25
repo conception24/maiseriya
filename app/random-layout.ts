@@ -27,7 +27,7 @@ export function randomRoom(random=Math.random):Point[]{
  ];
  let points=patterns[k].map(([x,z])=>({x,z}));if(random()<.5)points=points.map(p=>({x:-p.x,z:p.z})).reverse();return points;
 }
-export function randomArrangement(layout:Layout,random=Math.random):Layout{
+export function randomArrangement(layout:Layout,random=Math.random,attempt=0):Layout{
  const outline=layout.outline,items:Item[]=[],entry=entrance(outline),xs=outline.map(p=>p.x),zs=outline.map(p=>p.z),minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);let serial=0;let reserved:ReturnType<typeof bounds>[]=[];const guestAisles:ReturnType<typeof bounds>[]=[];
  const add=(kind:Kind,x:number,z:number,rotation=0)=>{const i={id:`random-${serial++}`,kind,x,z,rotation};if(kind==='four'||kind==='two'){
  if(guestAisles.some(r=>intersects(bounds(i),r)))return false;
@@ -71,6 +71,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   const path=aisleNav.aisleRoute(aisleStart,target);
   for(let j=0;j<path.length;j+=6){const q=path[j];guestAisles.push({x:q.x,z:q.z,w:1.35,d:1.35,rotation:0});}
  }
+ const mainAisleCount=guestAisles.length;
  // Each seating zone is a short aligned run. The open side is reserved for guests.
  const cap=Math.min(32,Math.max(4,Math.floor(area(outline)/10.5)));
  const guestSide=(seat:Item,side:number)=>{const a=seat.rotation*Math.PI/180,d=CATALOG[seat.kind].w/2+.4;return{x:seat.x+Math.cos(a)*d*side,z:seat.z+Math.sin(a)*d*side,w:.7,d:CATALOG[seat.kind].d,rotation:seat.rotation};};
@@ -110,7 +111,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const benchWalls=walls.map(e=>({e,score:e.length+random()*2})).sort((a,b)=>b.score-a.score).map(p=>p.e);
  const largeGroups=random()<.5?[3,4]:[4,3];
  for(const groups of[largeGroups,[4],[3]]){
-  for(const e of benchWalls){if(benchRuns>=runTarget)break;
+  for(const e of benchWalls){if(benchRuns>=runTarget||(groups===largeGroups&&outline.length>4&&benchRuns>=1))break;
    const length=Math.ceil((groups.reduce((n,c)=>n+c*.82,0)+(groups.length-1)*1.15)/1.84)*1.84;
    const start=length/2+.2,end=e.length-length/2-.2;if(start>end)continue;
    const positions=[];for(let t=start;t<=end+.001;t+=.6)positions.push(t);
@@ -126,32 +127,75 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   }
  }
  if(!benchRuns)throw new Error('連続ベンチ席と通路を確保できません。部屋を広げてください。');
- // Structural columns precede the remaining seating, and leave the planned main routes intact.
- // Prefer 2.3m wall clearance; narrower wings may use 1.8m, still over 1.3m from the column face.
- const columnCount=random()<.5?3:4,columnCandidates:{x:number;z:number;score:number}[]=[];
- const columnOffsetX=random()*.7,columnOffsetZ=random()*.7;
- for(let z=minZ+1.8+columnOffsetZ;z<maxZ-1.8;z+=.5)for(let x=minX+1.8+columnOffsetX;x<maxX-1.8;x+=.5){
-  const p={x,z};if(clearance(p)<1.8||!rectInRoom({x,z,w:1,d:1,rotation:0},outline,.1))continue;
-  columnCandidates.push({...p,score:random()});
+ // Treat columns as one orthogonal structural grid, rather than unrelated objects.
+ // Each grid node includes an attached partition, usable as an aisle/seat boundary.
+ const columnCount=random()<.5?3:4,columnOffsetX=random()*.5,columnOffsetZ=random()*.5;
+ type ColumnNode={ix:number;iz:number;column:Item;panels:Item[];score:number};
+ const columnNodes:ColumnNode[]=[],nodeMap=new Map<string,ColumnNode>();
+ const entryClear={x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle};
+ const moduleFits=(i:Item)=>!placementError(i,items,outline)&&!reserved.some(r=>intersects(bounds(i),r))&&!(attempt===0?guestAisles:guestAisles.slice(mainAisleCount)).some(r=>intersects(bounds(i),r))&&!intersects(bounds(i),entryClear);
+ for(let iz=0,z=minZ+1.8+columnOffsetZ;z<maxZ-1.8;iz++,z+=.5)for(let ix=0,x=minX+1.8+columnOffsetX;x<maxX-1.8;ix++,x+=.5){
+  if(clearance({x,z})<1.8)continue;
+  const column:Item={id:`column-${ix}-${iz}`,kind:'pillar',x,z,rotation:0};if(!moduleFits(column))continue;
+  const panels:Item[]=[];
+  for(const [dx,dz,rotation] of[[1,0,0],[-1,0,0],[0,1,90],[0,-1,90]]){
+   const panel:Item={id:`column-wall-${ix}-${iz}`,kind:'partition',x:x+dx*1.31,z:z+dz*1.31,rotation};
+   if(moduleFits(panel)&&!placementError(panel,[...items,column],outline))panels.push(panel);
+  }
+  if(!panels.length)continue;
+  const node={ix,iz,column,panels,score:random()+Math.min(3,clearance(column))*.15};
+  columnNodes.push(node);nodeMap.set(`${ix},${iz}`,node);
  }
- columnCandidates.sort((a,b)=>b.score-a.score);
- const columns:Item[]=[];
- for(const pass of[0,1])for(const p of columnCandidates){
-  if(columns.length>=columnCount)break;
-  if(clearance(p)<(pass===0?2.3:1.8))continue;
-  const i:Item={id:`column-${serial++}`,kind:'pillar',x:p.x,z:p.z,rotation:0};
-  const surround={...bounds(i),w:pass===0?1.5:1,d:pass===0?1.5:1};
-  if(columns.some(c=>Math.hypot(c.x-i.x,c.z-i.z)<(pass===0?3.6:2.8))||placementError(i,items,outline)||reserved.some(r=>intersects(surround,r))||guestAisles.some(r=>intersects(surround,r))||Math.hypot(i.x-entry.x,i.z-entry.z)<3.5)continue;
-  if(items.some(o=>intersects(surround,bounds(o))))continue;
-  const next=[...items,i],check=planningNavigator(next,outline,spawnPoint(outline,next));
-  if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(k=>check.reachable(k.point,.35)))continue;
-  if(!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
-  columns.push(i);items.push(i);
+ const patterns:{nodes:ColumnNode[];score:number}[]=[];
+ const pitches=[7,8,9,10,11,12,6,5,13,14,15,16,17,18,19,20]; // Common structural bays, including larger spans between separate wings.
+ for(const node of columnNodes)for(const dx of pitches){
+  for(const count of[columnCount,3])for(const [sx,sz] of[[1,0],[0,1]]){
+   const nodes=Array.from({length:count},(_,n)=>nodeMap.get(`${node.ix+n*dx*sx},${node.iz+n*dx*sz}`));
+   if(nodes.every(n=>n))patterns.push({nodes:nodes as ColumnNode[],score:nodes.reduce((n,q)=>n+q!.score,0)/count+random()*.3});
+  }
+  for(const dz of pitches){const corners=[[0,0],[dx,0],[0,dz],[dx,dz]].map(([x,z])=>nodeMap.get(`${node.ix+x},${node.iz+z}`));
+   if(columnCount===4&&corners.every(n=>n))patterns.push({nodes:corners as ColumnNode[],score:corners.reduce((n,q)=>n+q!.score,0)/4+random()*.3});
+   for(let missing=0;missing<4;missing++){const nodes=corners.filter((_,n)=>n!==missing);if(nodes.every(n=>n))patterns.push({nodes:nodes as ColumnNode[],score:nodes.reduce((n,q)=>n+q!.score,0)/3+random()*.3});}
+  }
  }
- if(columns.length<3)throw new Error('柱を3本と通路を確保できません。部屋を広げてください。');
- // At least one plain column and one mirrored column; the remaining finishes vary.
+ patterns.sort((a,b)=>b.nodes.length-a.nodes.length||b.score-a.score);
+ let columns:Item[]=[],columnPanels:Item[]=[];
+ for(const pattern of patterns){
+  // Choose attachments together, preventing partitions at one node from clipping another.
+  const bases=pattern.nodes.map(n=>n.column),zone=[...bases];
+  function attach(n:number):boolean{
+   if(n===pattern.nodes.length)return true;
+   for(const panel of pattern.nodes[n].panels){if(placementError(panel,[...items,...zone],outline))continue;zone.push(panel);if(attach(n+1))return true;zone.pop();}return false;
+  }
+  if(!attach(0))continue;
+  const next=[...items,...zone],check=planningNavigator(next,outline,spawnPoint(outline,next));
+  if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(k=>check.reachable(k.point,.35))||!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
+  columns=bases;columnPanels=zone.slice(bases.length);items.push(...zone);break;
+ }
+ if(columns.length<3){if(attempt<2)return randomArrangement(layout,random,attempt+1);throw new Error('柱と仕切りを整列させるスペースが足りません。部屋を広げてください。');}
+ // In tight wings, reroute the main corridor around the structural grid rather
+ // than distorting the grid to follow an earlier provisional route.
+ if(attempt>0){
+  const start=spawnPoint(outline,items),nav=planningNavigator(items,outline,start),routes:ReturnType<typeof bounds>[]=[];
+  for(const target of[...initialDoors.kitchens.map(k=>k.point),...(initialDoors.restroom?[initialDoors.restroom.point]:[]),...chosen]){
+   const path=nav.aisleRoute(start,target);for(let n=0;n<path.length;n+=4)routes.push({x:path[n].x,z:path[n].z,w:1.35,d:1.35,rotation:0});
+  }
+  guestAisles.splice(0,mainAisleCount,...routes);
+ }
  const mirrorCount=Math.max(1,Math.min(columns.length-1,Math.round(columns.length*random()*.75)));
  columns.forEach((column,n)=>{column.mirror=n<mirrorCount;});
+ // Let each attached partition organize seating where the customer approach fits.
+ // A clear side remains available when a column marks only an aisle boundary.
+ for(const panel of columnPanels){
+  const a=panel.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
+  const column=columns.find(i=>i.id===panel.id.replace('column-wall-','column-'))!;
+  const end=(panel.x-column.x)*c+(panel.z-column.z)*sn>0?1:-1;
+  const firstSide=random()<.5?1:-1;
+  seating:for(const kind of['four','two'] as const)for(const sign of[firstSide,-firstSide]){
+   const offset=CATALOG[kind].d/2+.02;
+   if(seat(kind,panel.x+c*.04*end-sn*offset*sign,panel.z+sn*.04*end+c*offset*sign,panel.rotation,end))break seating;
+  }
+ }
  const wallPhase=Math.floor(random()*3);if(random()<.5)walls.reverse();
  // Keep a consistent furniture type per run, with a cross aisle between each pair of booths.
  for(const [wallIndex,e] of walls.entries()){

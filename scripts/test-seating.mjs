@@ -61,6 +61,16 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  const next=randomArrangement({...initialLayout(),outline},random);parseDocument({version:2,...next});
  const columns=next.items.filter(i=>i.kind==='pillar');assert(columns.length>=3&&columns.length<=4,`column count in shape ${shape}`);
  assert(columns.some(i=>i.mirror===true)&&columns.some(i=>i.mirror===false),'plain and mirror finishes both occur');
+ const unique=(values)=>[...new Set(values.map(v=>v.toFixed(5)))];
+ const axesX=unique(columns.map(i=>i.x)),axesZ=unique(columns.map(i=>i.z));
+ assert(axesX.length===1||axesZ.length===1||(axesX.length===2&&axesZ.length===2),'columns must form one line or an orthogonal L/rectangle');
+ if(axesX.length===1||axesZ.length===1){const values=columns.map(i=>axesX.length===1?i.z:i.x).sort((a,b)=>a-b),pitch=values[1]-values[0];for(let n=2;n<values.length;n++)assert(Math.abs(values[n]-values[n-1]-pitch)<.001,'linear structural bays are evenly spaced');}
+ for(const column of columns){
+  const panel=next.items.find(i=>i.id===column.id.replace('column-','column-wall-'));assert(panel&&panel.kind==='partition','every column has an attached partition');
+  const a=panel.rotation*Math.PI/180,dx=panel.x-column.x,dz=panel.z-column.z;
+  assert(Math.abs(Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-1.31)<.001&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.001,'partition end physically touches column face without overlap');
+ }
+
  assert.equal(CATALOG.pillar.w,CATALOG.table.w);assert.equal(CATALOG.pillar.d,CATALOG.table.w);
  for(const p of columns){
   const distance=Math.min(...edges(outline).map(e=>{const t=Math.max(0,Math.min(e.length,(p.x-e.a.x)*e.tx+(p.z-e.a.z)*e.tz));return Math.hypot(p.x-e.a.x-e.tx*t,p.z-e.a.z-e.tz*t);}));
@@ -87,4 +97,4 @@ console.log(`PASS: 17 room families in both mirror directions, wall/partition ba
 const badPillar={id:'bad-pillar',kind:'pillar',x:0,z:0,rotation:0,mirror:'yes'};
 assert.throws(()=>parseDocument({version:2,outline,items:[badPillar]}));
 assert.throws(()=>parseDocument({version:2,outline,items:[{...badPillar,kind:'chair',mirror:true}]}));
-console.log('PASS: 3–4 collision-safe interior columns in all 34 plans, mixed mirror/plain finishes, table-width dimensions and validated finish persistence.');
+console.log('PASS: 3–4 aligned interior columns in all 34 plans, uniformly spaced lines or orthogonal L/rectangles, attached partitions at every column, mixed finishes and validated persistence.');

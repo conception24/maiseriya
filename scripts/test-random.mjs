@@ -39,7 +39,9 @@ for(let n=0;n<8;n++){
  const layout=proposals(initialLayout(),undefined,zoneRandom)[0].layout,tables=layout.items.filter(i=>i.kind==='two'||i.kind==='four');
  signatures.add(JSON.stringify(tables.map(({kind,x,z,rotation})=>({kind,x,z,rotation}))));
  const panels=layout.items.filter(i=>i.kind==='partition'&&i.id.startsWith('island-'));
- assert(panels.length>=3,'standard room must use a connected internal wall');
+ const columnWalls=layout.items.filter(i=>i.kind==='partition'&&i.id.startsWith('column-wall-'));
+ assert(panels.length>=3||columnWalls.length>=3,'standard room must organize seating around connected internal walls or column-backed partitions');
+ assert(columnWalls.some(p=>tables.some(t=>Math.hypot(t.x-p.x,t.z-p.z)<1.2)),'column-backed partitions must organize actual seating');
  const groups=Map.groupBy(panels,i=>i.id.slice(0,i.id.lastIndexOf('-')));
  for(const group of groups.values()){zoneShapes.add(group.length);const spine=group.slice(0,3);assert.equal(new Set(spine.map(i=>i.rotation)).size,1);for(let j=1;j<3;j++)assert(Math.abs(Math.hypot(spine[j].x-spine[j-1].x,spine[j].z-spine[j-1].z)-1.8)<.001);}
  let largestGap=0;

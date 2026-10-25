@@ -33,8 +33,8 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const initialDoors=createNavigator(items,outline,spawnPoint(outline,items));reserved=[...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].map(k=>({x:k.door.x+k.nx*.9,z:k.door.z+k.nz*.9,w:k.width+1.1,d:2.8,rotation:edges(outline)[k.edge].angle}));
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
- // Plan a connected main aisle before placing seating. Reserve a 1.5m swept strip
- // (three robot bodies) along entrance-to-interior routes, including split rooms.
+ // Plan a connected main aisle before placing seating. Reserve a 1.15m swept strip
+ // along entrance-to-interior routes, including split rooms.
  const aisleStart=spawnPoint(outline,items),aisleNav=createNavigator(items,outline,aisleStart);
  const targets:Point[]=[];
  for(let z=minZ+2;z<maxZ-1;z+=2)for(let x=minX+2;x<maxX-1;x+=2)
@@ -45,11 +45,11 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   targets.sort((a,b)=>Math.min(...[aisleStart,...chosen].map(p=>Math.hypot(b.x-p.x,b.z-p.z)))*clearance(b)-Math.min(...[aisleStart,...chosen].map(p=>Math.hypot(a.x-p.x,a.z-p.z)))*clearance(a));
   const target=targets.shift()!;chosen.push(target);
   const path=aisleNav.route(aisleStart,target);
-  for(let j=0;j<path.length;j+=6){const q=path[j];guestAisles.push({x:q.x,z:q.z,w:1.5,d:1.5,rotation:0});}
+  for(let j=0;j<path.length;j+=6){const q=path[j];guestAisles.push({x:q.x,z:q.z,w:1.15,d:1.15,rotation:0});}
  }
  // Each seating zone is a short aligned run. The open side is reserved for guests.
  const cap=Math.min(32,Math.max(4,Math.floor(area(outline)/10.5)));
- const guestSide=(seat:Item,side:number)=>{const a=seat.rotation*Math.PI/180,d=CATALOG[seat.kind].w/2+.48;return{x:seat.x+Math.cos(a)*d*side,z:seat.z+Math.sin(a)*d*side,w:.8,d:CATALOG[seat.kind].d,rotation:seat.rotation};};
+ const guestSide=(seat:Item,side:number)=>{const a=seat.rotation*Math.PI/180,d=CATALOG[seat.kind].w/2+.4;return{x:seat.x+Math.cos(a)*d*side,z:seat.z+Math.sin(a)*d*side,w:.7,d:CATALOG[seat.kind].d,rotation:seat.rotation};};
  function seat(kind:'two'|'four',x:number,z:number,rotation:number,side:number){
   if(items.filter(i=>i.kind==='two'||i.kind==='four').length>=cap)return false;
   const next:Item={id:'check',kind,x,z,rotation},aisle=guestSide(next,side);
@@ -64,9 +64,9 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const wallPhase=Math.floor(random()*3);if(random()<.5)walls.reverse();
  // Keep a consistent furniture type per run, with a cross aisle between each pair of booths.
  for(const [wallIndex,e] of walls.entries()){
-  const rotation=(e.angle+90+360)%360,kind=(wallIndex+wallPhase)%3===1?'two':'four',pitch=kind==='four'?2.22:2.65;
+  const rotation=(e.angle+90+360)%360,kind=(wallIndex+wallPhase)%3===1?'two':'four',pitch=kind==='four'?2.22:2.35;
   const offset=CATALOG[kind].w/2+.12;
-  for(let n=0,t=1.35+Math.floor(random()*3)*.25;t<e.length-1.35;n++,t+=pitch+(kind==='four'&&n%2===1?1.3:0))seat(kind,e.a.x+e.tx*t+e.nx*offset,e.a.z+e.tz*t+e.nz*offset,rotation,1);
+  for(let n=0,t=1.35+Math.floor(random()*3)*.25;t<e.length-1.35;n++,t+=pitch+(kind==='four'&&n%2===1?.95:0))seat(kind,e.a.x+e.tx*t+e.nx*offset,e.a.z+e.tz*t+e.nz*offset,rotation,1);
  }
  // Furnished islands form short internal walls. Their exposed sides remain guest aisles.
  // Try complete modules atomically, so a failed row cannot leave a stray partition behind.
@@ -78,7 +78,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   const local=(kind:Kind,u:number,v:number,turn=0):Item=>({id:`island-${serial}-${zone.length}`,kind,x:x+c*u-sn*v,z:z+sn*u+c*v,rotation:(rotation+turn)%360});
   for(const v of[-1.8,0,1.8])zone.push(local('partition',0,v,90));
   for(const [kind,side] of[[left,-1],[right,1]] as const){if(!kind)continue;
-   const offset=CATALOG[kind].w/2+.08,pitch=kind==='four'?2.22:2.5;
+   const offset=CATALOG[kind].w/2+.08,pitch=kind==='four'?2.22:2.3;
    for(const v of[-pitch/2,pitch/2]){const i=local(kind,offset*side,v);zone.push(i);aisles.push(guestSide(i,side));}
   }
   // A return at one end makes an L, leaving the other end and the long access side open.
@@ -107,7 +107,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  zoneCandidates.sort((a,b)=>b.score-a.score);
  const palettes:[ZoneKind|null,ZoneKind|null][] = random()<.5?[['four','four'],['two','four'],['four',null],[null,'two']]:[['four','two'],['four','four'],[null,'four'],['two',null]];
  const corner=random()<.65;let islands=0;
- for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/65)))break;
+ for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/50)))break;
   if(island(p.x,p.z,p.rotation,left,right,corner)){islands++;}
  }}
  // Fill residual dining pockets with an aligned pair of two-person tables.
@@ -115,7 +115,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  for(const p of zoneCandidates){
   if(items.filter(i=>i.kind==='two'||i.kind==='four').length+2>cap)break;
   if(Math.min(...items.filter(i=>['two','four'].includes(i.kind)).map(i=>Math.hypot(i.x-p.x,i.z-p.z)))<2.2)continue;
-  const a=p.rotation*Math.PI/180,dx=-Math.sin(a)*1.3,dz=Math.cos(a)*1.3;
+  const a=p.rotation*Math.PI/180,dx=-Math.sin(a)*1.15,dz=Math.cos(a)*1.15;
   const before=items.length,aisleCount=guestAisles.length;
   if(seat('two',p.x-dx,p.z-dz,p.rotation,1)&&seat('two',p.x+dx,p.z+dz,p.rotation,1))continue;
   items.splice(before);guestAisles.splice(aisleCount);
@@ -153,7 +153,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const nav=createNavigator(items,outline,spawn);
  for(let z=maxZ-2;z>minZ+1&&items.filter(i=>i.kind==='robot').length<3;z-=1)for(let x=minX+1;x<maxX-1;x+=1){if(items.filter(i=>i.kind==='robot').length>=3)break;if(nav.route(spawn,{x,z}).length)add('robot',x,z);}
  // Screens only mark the END of a seating run, never its access side.
- let screens=items.filter(i=>i.kind==='partition').length;for(const i of items.filter(i=>i.kind==='four')){if(screens>=2)break;const a=i.rotation*Math.PI/180;
+ let screens=items.filter(i=>i.kind==='partition').length;for(const i of items.filter(i=>i.kind==='four')){if(screens>=Math.min(22,Math.max(10,Math.ceil(area(outline)/9))))break;const a=i.rotation*Math.PI/180;
   for(const sign of[-1,1]){const candidate:Item={id:`random-${serial++}`,kind:'partition',x:i.x-Math.sin(a)*1.25*sign,z:i.z+Math.cos(a)*1.25*sign,rotation:i.rotation};
    if(guestAisles.some(r=>intersects(bounds(candidate),r))||reserved.some(r=>intersects(bounds(candidate),r))||placementError(candidate,items,outline))continue;
    const next=[...items,candidate],check=createNavigator(next,outline,spawn);
@@ -177,6 +177,6 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
 
 // Both seats/bench ends must open onto one connected, guest-sized approach strip.
 export function customerSeatAccess(item:Item,nav:ReturnType<typeof createNavigator>){
- const a=item.rotation*Math.PI/180,side=CATALOG[item.kind].w/2+.48;
+ const a=item.rotation*Math.PI/180,side=CATALOG[item.kind].w/2+.4;
  return [-1,1].some(sign=>[-.72,0,.72].every(z=>nav.reachable({x:item.x+Math.cos(a)*side*sign-Math.sin(a)*z,z:item.z+Math.sin(a)*side*sign+Math.cos(a)*z},.22)));
 }

@@ -2,11 +2,25 @@ import {CATALOG,bounds,edges,isArt,spawnPoint,type Layout} from './floor-plan';
 import {area,rectInRoom} from './geometry';
 import {createNavigator} from './robot-navigation';
 import {customerSeatAccess,randomArrangement} from './random-layout';
-export type Preferences={density:number;order:number;coverage:number;wall:number};
-export const defaultPreferences:Preferences={density:1,order:1,coverage:1,wall:1};
-export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;score:number};
+export type Preferences={density:number;order:number;coverage:number;wall:number;dividers:number};
+export const defaultPreferences:Preferences={density:1,order:1,coverage:1.15,wall:1.2,dividers:1.2};
+export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;dividers:number;score:number};
 export type Proposal={layout:Layout;assessment:Assessment};
-export type Feedback={choice:'A'|'B'|'neither';reason:string;note:string;at:string;a:Proposal;b:Proposal};
+export const ISSUE_OPTIONS=[
+ {id:'aisles-wide',label:'通路が広すぎる'}, {id:'aisles-narrow',label:'通路が狭すぎる'},
+ {id:'few-walls',label:'追加壁・仕切りが少ない'}, {id:'many-walls',label:'追加壁・仕切りが多すぎる'},
+ {id:'many-tables',label:'テーブルが多すぎる'}, {id:'few-tables',label:'テーブルが少なすぎる'},
+ {id:'empty-space',label:'大きな空白・無駄な隙間がある'}, {id:'unaligned',label:'席や壁の並びがそろっていない'},
+ {id:'seat-access',label:'席に入りにくい・閉じ込められている'}, {id:'booth-backs',label:'ボックス席の背中合わせが不自然'},
+ {id:'wall-seats',label:'壁沿いに置くべき席が中央にある'}, {id:'route-confusing',label:'通路が分かりにくい・行き止まりがある'},
+ {id:'entry-seats',label:'入口のすぐ前に席がある'}, {id:'toilet-seats',label:'トイレの前に席がある'},
+ {id:'kitchen-route',label:'キッチンの出入り・配膳の道が悪い'}, {id:'checkout',label:'レジの場所が不自然'},
+ {id:'drinkbar',label:'ドリンクバーの場所・利用空間が悪い'}, {id:'supply',label:'調味料台の場所・取りやすさが悪い'},
+ {id:'seat-mix',label:'二人席・団体席の割合がおかしい'}, {id:'wall-route',label:'追加壁が通路や席のまとまりを作れていない'}
+] as const;
+export type AnswerId=typeof ISSUE_OPTIONS[number]['id']|'good'|'unsure'|'other';
+export type Feedback={answer:AnswerId;label:string;note:string;at:string;proposal:Proposal};
+
 export function assess(layout:Layout,weights:Preferences=defaultPreferences):Assessment{
  const tables=layout.items.filter(i=>i.kind==='two'||i.kind==='four'),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items));
  const blocked=tables.filter(i=>!customerSeatAccess(i,nav)).length+layout.items.filter(i=>['serviceTable','drinkbar','checkout'].includes(i.kind)&&!nav.reachable({x:i.x-Math.sin(i.rotation*Math.PI/180)*.85,z:i.z+Math.cos(i.rotation*Math.PI/180)*.85},.3)).length;
@@ -17,19 +31,28 @@ export function assess(layout:Layout,weights:Preferences=defaultPreferences):Ass
  for(let x=Math.min(...xs)+1;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+1;z<Math.max(...zs);z+=1){
   if(!rectInRoom({x,z,w:1,d:1,rotation:0},layout.outline,.1))continue;samples++;
   const distance=Math.min(...layout.items.filter(i=>!isArt(i.kind)&&i.kind!=='robot').map(i=>{const a=i.rotation*Math.PI/180,dx=x-i.x,dz=z-i.z,r=bounds(i);return Math.hypot(Math.max(0,Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-r.w/2),Math.max(0,Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))-r.d/2));}));
-  if(distance>1.8)unused++;
+  if(distance>1.4)unused++;
  }
- const coverage=1-unused/Math.max(1,samples),score=(density*weights.density+order*weights.order+coverage*weights.coverage+wall*weights.wall)*25-Math.abs(density-.8)*40-blocked*1000;
- return{tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,score};
+ const dividers=Math.min(1,layout.items.filter(i=>i.kind==='partition').length/Math.max(6,area(layout.outline)/15));
+ const coverage=1-unused/Math.max(1,samples),score=(density*weights.density+order*weights.order+coverage*weights.coverage+wall*weights.wall+dividers*weights.dividers)*20-Math.abs(density-.8)*40-blocked*1000;
+ return{tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,dividers,score};
 }
 export function proposals(layout:Layout,weights:Preferences=defaultPreferences,random=Math.random):Proposal[]{
  const candidates=Array.from({length:4},()=>{const next=randomArrangement(layout,random);return{layout:next,assessment:assess(next,weights)};});
  return candidates.filter(p=>p.assessment.blocked===0&&p.assessment.tables>0).sort((a,b)=>b.assessment.score-a.assessment.score);
 }
-// Bounded preference updates never weaken collision or guest-access constraints.
+// Only direct, measurable answers tune candidate ranking. Other issues are retained
+// with the entire plan for later design-rule changes; safety checks stay mandatory.
 export function learn(weights:Preferences,feedback:Feedback):Preferences{
- if(feedback.choice==='neither')return weights;
- const winner=feedback.choice==='A'?feedback.a:feedback.b,loser=feedback.choice==='A'?feedback.b:feedback.a,next={...weights};
- for(const key of Object.keys(next) as (keyof Preferences)[])next[key]=Math.max(.35,Math.min(2.5,next[key]+.4*(winner.assessment[key]-loser.assessment[key])));
+ const next={...weights};
+ const changes:Partial<Record<AnswerId,Partial<Preferences>>>={
+  'aisles-wide':{coverage:.18},'aisles-narrow':{coverage:-.18},
+  'few-walls':{dividers:.22,wall:.1},'many-walls':{dividers:-.22},
+  'many-tables':{density:-.18},'few-tables':{density:.18},
+  'empty-space':{coverage:.18},'unaligned':{order:.2},'wall-seats':{wall:.2},'wall-route':{wall:.2}
+ };
+ for(const [key,value] of Object.entries(changes[feedback.answer]??{})){
+  const k=key as keyof Preferences;next[k]=Math.max(.35,Math.min(2.5,next[k]+value!));
+ }
  return next;
 }

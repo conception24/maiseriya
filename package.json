@@ -12,7 +12,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "build:standalone": "vite build --config vite.local.config.ts --outDir work/standalone-build && node scripts/package-standalone.mjs",
-    "test:layout": "node scripts/test-builder.mjs && node scripts/test-random.mjs && node scripts/test-review.mjs && node scripts/test-seating.mjs"
+    "test:layout": "node scripts/test-builder.mjs && node scripts/test-random.mjs && node scripts/test-review.mjs && node scripts/test-seating.mjs && node scripts/test-geometry.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

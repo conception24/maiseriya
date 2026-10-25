@@ -3,19 +3,27 @@ import {intersects,rectInRoom,area} from './geometry';
 import {banquetteRun,smallTableGroups,smallGroupAccess,diningCost,checkoutStaffArea} from './seating-rules';
 import {createNavigator} from './robot-navigation';
 const planningNavigator=(items:Item[],outline:Point[],home:Point)=>createNavigator(items,outline,home,{services:false});
-// Connected outlines, including two dining rooms joined by a narrow corridor.
+// Sixteen everyday footprints, with a wide-waisted hourglass as a rare exception.
 export function randomRoom(random=Math.random):Point[]{
- const w=7+Math.floor(random()*2),d=8+Math.floor(random()*2),k=Math.floor(random()*9);
+ const w=6.5+Math.floor(random()*5)*.5,d=7.5+Math.floor(random()*5)*.5,roll=random(),k=roll>=.98?16:Math.floor(roll/.98*16);
  const patterns:number[][][]=[
  [[-w,-d],[w,-d],[w,d],[-w,d]],
  [[-w+2,-d],[w-2,-d],[w,-d+2],[w,d-2],[w-2,d],[-w+2,d],[-w,d-2],[-w,-d+2]],
  [[-w,-d],[w,-d],[w,1],[1,1],[1,d],[-w,d]],
  [[-w,-d],[-2,-d],[-2,-1],[2,-1],[2,-d],[w,-d],[w,d],[-w,d]],
  [[-w,-d],[w,-d],[w,-2],[1,-2],[1,2],[w,2],[w,d],[-w,d]],
- [[-w-4,-d],[-1.5,-d],[-1.5,-1.1],[1.5,-1.1],[1.5,-d],[w+4,-d],[w+4,d],[1.5,d],[1.5,1.1],[-1.5,1.1],[-1.5,d],[-w-4,d]],
+ [[-w-3,-d],[-1.5,-d],[-1.5,-3.3],[1.5,-3.3],[1.5,-d],[w+3,-d],[w+3,d],[1.5,d],[1.5,3.3],[-1.5,3.3],[-1.5,d],[-w-3,d]],
  [[-w,-d],[w,-d],[w,-1],[3.5,-1],[3.5,d],[-3.5,d],[-3.5,-1],[-w,-1]],
  [[-w,-d],[2,-d],[2,-3],[w,-3],[w,d],[-2,d],[-2,3],[-w,3]],
- [[-w,-d],[w,-d],[w,-1],[1.1,-1],[1.1,2],[w,2],[w,d+4],[-w,d+4],[-w,2],[-1.1,2],[-1.1,-1],[-w,-1]]
+ [[-w,-d],[w-3,-d],[w-3,-2],[w,-2],[w,d],[-w,d]],
+ [[-w,-d],[w,-d],[w,d-3],[2,d-3],[2,d],[-w,d]],
+ [[-w,-d],[w,-d],[w,d],[-w+3,d],[-w+3,2],[-w,2]],
+ [[-w,-d],[w,-d],[w,-3],[w-2,-3],[w-2,3],[w,3],[w,d],[-w,d]],
+ [[-w,-d],[w,-d],[w,d],[2,d],[2,d-2],[-2,d-2],[-2,d],[-w,d]],
+ [[-w,-d],[w-2,-d],[w-2,-d+2],[w,-d+2],[w,d],[-w+2,d],[-w+2,d-2],[-w,d-2]],
+ [[-w,-d],[1,-d],[1,-d+3],[w,-d+3],[w,d],[-1,d],[-1,d-3],[-w,d-3]],
+ [[-w,-d],[w,-d],[w,d-4],[w-3,d-4],[w-3,d],[-w+3,d],[-w+3,d-4],[-w,d-4]],
+ [[-w,-d],[w,-d],[w,-1],[3.3,-1],[3.3,2],[w,2],[w,d+3],[-w,d+3],[-w,2],[-3.3,2],[-3.3,-1],[-w,-1]]
  ];
  let points=patterns[k].map(([x,z])=>({x,z}));if(random()<.5)points=points.map(p=>({x:-p.x,z:p.z})).reverse();return points;
 }
@@ -77,6 +85,47 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   guestAisles.push(aisle);return true;
  }
  const walls=edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.length>4).sort((a,b)=>b.length-a.length);
+ // 連続ベンチ席: reserve these first, so ordinary booth rows cannot crowd them out.
+ // Backrests follow an exterior wall; the table groups and seams remain independent.
+ let benchRuns=0;
+ const runTarget=Math.min(4,Math.max(2,Math.floor(area(outline)/110)));
+ function placeBenchRun(x:number,z:number,rotation:number,groups:number[],backing=false){
+  const run=banquetteRun(`banquette-${serial++}`,x,z,rotation,groups);
+  if(diningCost(items)+groups.reduce((n,c)=>n+c/2,0)>cap)return false;
+  const zone=[...run.items];
+  if(backing){const a=rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),count=Math.ceil(run.length/1.8);
+   for(let n=0;n<count;n++){const u=(n-(count-1)/2)*1.8;zone.push({id:`banquette-wall-${serial}-${n}`,kind:'partition',x:x+c*u-sn*.348,z:z+sn*u+c*.348,rotation});}
+  }
+  const entryClear={x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle};
+  if(zone.some((i,n)=>placementError(i,[...items,...zone.slice(0,n)],outline)||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||intersects(bounds(i),entryClear)))return false;
+  if(run.aisles.some(r=>!rectInRoom(r,outline,.1)||[...items,...zone].some(i=>!isArt(i.kind)&&intersects(r,bounds(i)))))return false;
+  const next=[...items,...zone],check=planningNavigator(next,outline,spawnPoint(outline,next));
+  if(!next.filter(t=>['two','four'].includes(t.kind)).every(t=>customerSeatAccess(t,check))||!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))return false;
+  const front=run.aisles.at(-1)!,a=rotation*Math.PI/180;
+  if(![-.4,0,.4].every(t=>check.reachable({x:front.x+Math.cos(a)*front.w*t,z:front.z+Math.sin(a)*front.w*t},.35)))return false;
+  // Keep counter fronts usable as well as the main aisle.
+  if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(k=>check.reachable(k.point,.35)))return false;
+  items.push(...zone);guestAisles.push(...run.aisles);benchRuns++;return true;
+ }
+ const benchWalls=walls.map(e=>({e,score:e.length+random()*2})).sort((a,b)=>b.score-a.score).map(p=>p.e);
+ const largeGroups=random()<.5?[3,4]:[4,3];
+ for(const groups of[largeGroups,[4],[3]]){
+  for(const e of benchWalls){if(benchRuns>=runTarget)break;
+   const length=Math.ceil((groups.reduce((n,c)=>n+c*.82,0)+(groups.length-1)*1.15)/1.84)*1.84;
+   const start=length/2+.2,end=e.length-length/2-.2;if(start>end)continue;
+   const positions=[];for(let t=start;t<=end+.001;t+=.6)positions.push(t);
+   if(random()<.5)positions.reverse();
+   for(const t of positions)if(placeBenchRun(e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,(e.angle+180+360)%360,groups))break;
+  }
+  if(benchRuns>=runTarget)break;
+ }
+ // Interior runs have a continuous wooden backing, never a free-floating bench back.
+ if(benchRuns<runTarget){
+  search:for(let z=minZ+3;z<maxZ-3;z+=1.2)for(let x=minX+3;x<maxX-3;x+=1.2)for(const rotation of[0,90,180,270]){
+   if(placeBenchRun(x,z,rotation,[3],true)&&benchRuns>=runTarget)break search;
+  }
+ }
+ if(!benchRuns)throw new Error('連続ベンチ席と通路を確保できません。部屋を広げてください。');
  const wallPhase=Math.floor(random()*3);if(random()<.5)walls.reverse();
  // Keep a consistent furniture type per run, with a cross aisle between each pair of booths.
  for(const [wallIndex,e] of walls.entries()){
@@ -125,24 +174,6 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   for(const rotation of[preferred,90-preferred])zoneCandidates.push({x,z,rotation,score:distance+random()*.9+(rotation===preferred?.4:0)});
  }
  zoneCandidates.sort((a,b)=>b.score-a.score);
- // Connected banquettes create 6/8-person groups without forcing bench seams
- // to coincide with table edges. The front aisle and the inter-group gap stay open.
- const runGroups=random()<.5?[3,4]:[4,3];
- for(const p of zoneCandidates){let placed=false;
-  for(const rotation of[(p.rotation+90)%360,(p.rotation+270)%360]){
-   const run=banquetteRun(`banquette-${serial++}`,p.x,p.z,rotation,runGroups);
-   if(diningCost(items)+3.5>cap)continue;
-   const entryClear={x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle};
-   if(run.items.some((i,n)=>placementError(i,[...items,...run.items.slice(0,n)],outline)||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||intersects(bounds(i),entryClear)))continue;
-   if(run.aisles.some(r=>!rectInRoom(r,outline,.1)||[...items,...run.items].some(i=>!isArt(i.kind)&&intersects(r,bounds(i)))))continue;
-   const next=[...items,...run.items],check=planningNavigator(next,outline,spawnPoint(outline,next));
-   if(!next.filter(t=>['two','four'].includes(t.kind)).every(t=>customerSeatAccess(t,check))||!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
-   const front=run.aisles.at(-1)!;const a=rotation*Math.PI/180;
-   if(![-.4,0,.4].every(t=>check.reachable({x:front.x+Math.cos(a)*front.w*t,z:front.z+Math.sin(a)*front.w*t},.35)))continue;
-   items.push(...run.items);guestAisles.push(...run.aisles);placed=true;break;
-  }
-  if(placed)break;
- }
  const palettes:[ZoneKind|null,ZoneKind|null][] = random()<.5?[['four','four'],['two','four'],['four',null],[null,'two']]:[['four','two'],['four','four'],[null,'four'],['two',null]];
  const corner=random()<.65;let islands=0;
  for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/50)))break;

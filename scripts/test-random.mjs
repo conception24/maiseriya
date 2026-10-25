@@ -19,7 +19,7 @@ const l=initialLayout(),fleet=createFleet(l.items,l.outline);let moving=0,total=
 
 
 // The two-room plan must use both kitchen portals without robot collisions.
-let calls=0;const twoRoom=randomRoom(()=>[.4,.4,.6,.8][calls++]);
+let calls=0;const twoRoom=randomRoom(()=>[.4,.4,.33,.8][calls++]);
 const connected=randomArrangement({...initialLayout(),outline:twoRoom},random),connectedFleet=createFleet(connected.items,connected.outline),used=new Set();
 assert.equal(connectedFleet.kitchens.length,2);
 for(let n=0;n<9000;n++){connectedFleet.step(1/30,{x:100,z:100},false);const bots=connectedFleet.states();for(const a of bots){if(a.phase==='enter'||a.phase==='exit')for(const k of connectedFleet.kitchens)if(Math.hypot(a.x-k.door.x,a.z-k.door.z)<1)used.add(k.edge);for(const b of bots)if(a!==b&&!a.hidden&&!b.hidden)assert(Math.hypot(a.x-b.x,a.z-b.z)>=.589);}}

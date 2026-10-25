@@ -11,7 +11,7 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  table:{name:'小さなテーブル',description:'2人用・木目の天板',w:.82,d:.78,seats:0},
  wideTable:{name:'大きなテーブル',description:'4人用・木目の天板',w:1.53,d:.8,seats:0},
  chair:{name:'椅子',description:'籐編み / グレー2種類',w:.49,d:.5,seats:1},
- bench:{name:'クッション席',description:'2人掛けのベンチ',w:1.84,d:.66,seats:2},
+ bench:{name:'長椅子',description:'つないで小テーブルと向かいの椅子を添えると「連続ベンチ席」になります',w:1.84,d:.66,seats:2},
  partition:{name:'木の仕切り',description:'薄い板・丸い上角',w:1.8,d:.036,seats:0},
  venus:{name:'ヴィーナスの誕生',description:'ボッティチェリ / 壁に配置',w:2,d:.12,seats:0},
  primavera:{name:'春（プリマヴェーラ）',description:'ボッティチェリ / 壁に配置',w:2,d:.12,seats:0},

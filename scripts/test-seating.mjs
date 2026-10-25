@@ -4,6 +4,7 @@ import {CATALOG,bounds,canWalk,colliders,initialLayout,parseDocument,spawnPoint,
 import {createNavigator} from '../work/model-test/robot-navigation.mjs';
 import {proposals} from '../work/model-test/layout-review.mjs';
 import {intersects} from '../work/model-test/geometry.mjs';
+import {randomRoom,randomArrangement} from '../work/model-test/random-layout.mjs';
 const outline=[{x:-7,z:-8},{x:7,z:-8},{x:7,z:8},{x:-7,z:8}];
 for(const rotation of[0,90,180,270]){
  const run=banquetteRun('test-run',0,0,rotation,[3,4]);
@@ -41,3 +42,35 @@ assert(main.filter(p=>Math.min(p.x+6,6-p.x,p.z+8.5,6.5-p.z)>1.25).length/main.le
 console.log('PASS: main aisles prefer interior clearance and remain collision-safe.');
 
 const exactTarget={x:5.15,z:-5.7},exactRoute=empty.route({x:0,z:5.75},exactTarget);assert.deepEqual(exactRoute.at(-1),exactTarget);assert(exactRoute.every(p=>empty.canMove(p)));console.log('PASS: non-grid doorway targets are reached exactly without repeated return/yield loops.');
+
+// Every generated footprint contains connected benches whose backs touch a wall
+// or the continuous wooden backing. No scoring preference may drop these seats.
+const shapes=new Set();let rare=0;
+for(let n=0;n<1000;n++){
+ const roll=(n+.5)/1000;let calls=0;
+ const room=randomRoom(()=>[.4,.4,roll,.8][calls++]);shapes.add(JSON.stringify(room));
+ if(room.length===12&&room.some(p=>p.z>10))rare++;
+}
+assert.equal(shapes.size,17);assert.equal(rare,20,'hourglass occurs only 2% of the time');
+let calls=0;const hourglass=randomRoom(()=>[.4,.4,.99,.8][calls++]);
+assert(hourglass.some(p=>p.x===3.3)&&hourglass.some(p=>p.x===-3.3),'hourglass waist is 6.6m, three times the former 2.2m');
+let totalRuns=0;
+for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
+ let calls=0;const roll=shape===16?.99:(shape+.5)*.98/16;
+ const outline=randomRoom(()=>[.4,.4,roll,mirror][calls++]);
+ const next=randomArrangement({...initialLayout(),outline},random);parseDocument({version:2,...next});
+ const benches=next.items.filter(i=>i.kind==='bench');assert(benches.length>=2,`missing continuous bench in shape ${shape}`);
+ const runs=new Set(benches.map(i=>i.id.split('-bench-')[0]));totalRuns+=runs.size;
+ for(const b of benches){
+  const a=b.rotation*Math.PI/180,back={x:b.x-Math.sin(a)*.33,z:b.z+Math.cos(a)*.33};
+  const nearOuter=edges(outline).some(e=>{const u=(back.x-e.a.x)*e.tx+(back.z-e.a.z)*e.tz;return u>=0&&u<=e.length&&Math.abs((back.x-e.a.x)*e.nx+(back.z-e.a.z)*e.nz)<.1;});
+  const backing=next.items.filter(i=>i.kind==='partition'&&i.id.startsWith('banquette-wall-'));
+  const nearPanel=backing.some(p=>{const dx=back.x-p.x,dz=back.z-p.z;return p.rotation===b.rotation&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.025&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<.91;});
+  assert(nearOuter||nearPanel,`unsupported bench back in shape ${shape}`);
+  assert(benches.some(q=>q!==b&&q.rotation===b.rotation&&Math.abs(Math.hypot(q.x-b.x,q.z-b.z)-1.84)<.001),'each bench is connected to another bench');
+ }
+ const nav=createNavigator(next.items,outline,spawnPoint(outline,next.items),{services:false});
+ for(const g of smallTableGroups(next.items))assert(smallGroupAccess(g,nav));
+}
+assert(totalRuns>=60,'normally include multiple continuous bench runs');
+console.log(`PASS: 17 room families in both mirror directions, wall/partition backed connected benches in every plan (${totalRuns} runs), 2% wide-waisted hourglass.`);

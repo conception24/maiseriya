@@ -1,10 +1,11 @@
-import {CATALOG,bounds,edges,isArt,spawnPoint,type Layout} from './floor-plan';
+import {CATALOG,bounds,edges,isArt,spawnPoint,entrance,type Layout} from './floor-plan';
 import {area,rectInRoom} from './geometry';
 import {createNavigator} from './robot-navigation';
+import {diningCost,smallTableGroups,smallGroupAccess} from './seating-rules';
 import {customerSeatAccess,randomArrangement} from './random-layout';
 export type Preferences={density:number;order:number;coverage:number;wall:number;dividers:number};
 export const defaultPreferences:Preferences={density:1,order:1,coverage:1.15,wall:1.2,dividers:1.2};
-export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;dividers:number;score:number};
+export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;dividers:number;banquette:number;emptyRadius:number;score:number};
 export type Proposal={layout:Layout;assessment:Assessment};
 export const ISSUE_OPTIONS=[
  {id:'aisles-wide',label:'通路が広すぎる'}, {id:'aisles-narrow',label:'通路が狭すぎる'},
@@ -29,23 +30,24 @@ export function toggleAnswer(selected:AnswerSelection[],answer:AnswerSelection):
 }
 
 export function preferenceScore(a:Omit<Assessment,'score'>,weights:Preferences):number{
- return(a.density*weights.density+a.order*weights.order+a.coverage*weights.coverage+a.wall*weights.wall+a.dividers*weights.dividers)*20-Math.abs(a.density-.8)*40-a.blocked*1000;
+ return(a.density*weights.density+a.order*weights.order+a.coverage*weights.coverage+a.wall*weights.wall+a.dividers*weights.dividers)*20-Math.abs(a.density-.8)*40-a.blocked*1000+(a.banquette??0)*12-Math.max(0,(a.emptyRadius??0)-2.3)*40;
 }
 export function assess(layout:Layout,weights:Preferences=defaultPreferences):Assessment{
- const tables=layout.items.filter(i=>i.kind==='two'||i.kind==='four'),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items));
- const blocked=tables.filter(i=>!customerSeatAccess(i,nav)).length+layout.items.filter(i=>['serviceTable','drinkbar','checkout'].includes(i.kind)&&!nav.reachable({x:i.x-Math.sin(i.rotation*Math.PI/180)*.85,z:i.z+Math.cos(i.rotation*Math.PI/180)*.85},.3)).length;
- const density=Math.min(1,tables.length/Math.max(1,area(layout.outline)/10.5));
+ const tables=layout.items.filter(i=>['two','four','table'].includes(i.kind)),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items),{services:false});
+ const blocked=tables.filter(i=>i.kind!=='table'&&!customerSeatAccess(i,nav)).length+smallTableGroups(layout.items).filter(g=>!smallGroupAccess(g,nav)).length+[...nav.kitchens,...(nav.restroom?[nav.restroom]:[])].filter(p=>!nav.reachable(p.point,.35)).length+layout.items.filter(i=>['serviceTable','drinkbar','checkout'].includes(i.kind)&&!nav.reachable({x:i.x-Math.sin(i.rotation*Math.PI/180)*.85,z:i.z+Math.cos(i.rotation*Math.PI/180)*.85},.3)).length;
+ const density=Math.min(1,diningCost(layout.items)/Math.max(1,area(layout.outline)/10.5));
  const order=tables.filter(i=>tables.some(j=>j!==i&&i.rotation%180===j.rotation%180&&(Math.abs(i.x-j.x)<.12||Math.abs(i.z-j.z)<.12))).length/Math.max(1,tables.length);
  const wall=tables.filter(i=>walls.some(e=>{const t=(i.x-e.a.x)*e.tx+(i.z-e.a.z)*e.tz;return t>=0&&t<=e.length&&Math.abs((i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz)<CATALOG[i.kind].w/2+.35;})||layout.items.some(p=>p.kind==='partition'&&Math.hypot(i.x-p.x,i.z-p.z)<2)).length/Math.max(1,tables.length);
- let samples=0,unused=0;const xs=layout.outline.map(p=>p.x),zs=layout.outline.map(p=>p.z);
- for(let x=Math.min(...xs)+1;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+1;z<Math.max(...zs);z+=1){
+ let samples=0,unused=0,emptyRadius=0;const entry=entrance(layout.outline);const xs=layout.outline.map(p=>p.x),zs=layout.outline.map(p=>p.z);
+ for(let x=Math.min(...xs)+1;x<Math.max(...xs);x+=.5)for(let z=Math.min(...zs)+1;z<Math.max(...zs);z+=.5){
   if(!rectInRoom({x,z,w:1,d:1,rotation:0},layout.outline,.1))continue;samples++;
   const distance=Math.min(...layout.items.filter(i=>!isArt(i.kind)&&i.kind!=='robot').map(i=>{const a=i.rotation*Math.PI/180,dx=x-i.x,dz=z-i.z,r=bounds(i);return Math.hypot(Math.max(0,Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-r.w/2),Math.max(0,Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))-r.d/2));}));
-  if(distance>1.4)unused++;
+  if(distance>1.4)unused++;if(Math.hypot(x-entry.x,z-entry.z)>3.5)emptyRadius=Math.max(emptyRadius,distance);
  }
+ const banquette=layout.items.some(i=>i.kind==='bench')&&smallTableGroups(layout.items).some(g=>g.length===3||g.length===4)?1:0;
  const dividers=Math.min(1,layout.items.filter(i=>i.kind==='partition').length/Math.max(6,area(layout.outline)/15));
- const coverage=1-unused/Math.max(1,samples),score=preferenceScore({density,order,coverage,wall,dividers,blocked,tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0)},weights);
- return{tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,dividers,score};
+ const coverage=1-unused/Math.max(1,samples),score=preferenceScore({density,order,coverage,wall,dividers,banquette,emptyRadius,blocked,tables:tables.length,seats:layout.items.reduce((n,i)=>n+CATALOG[i.kind].seats,0)},weights);
+ return{tables:tables.length,seats:layout.items.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,dividers,banquette,emptyRadius,score};
 }
 export function proposals(layout:Layout,weights:Preferences=defaultPreferences,random=Math.random):Proposal[]{
  const candidates=Array.from({length:4},()=>{const next=randomArrangement(layout,random);return{layout:next,assessment:assess(next,weights)};});

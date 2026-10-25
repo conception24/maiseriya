@@ -1,6 +1,7 @@
+import {segmentDistance} from './geometry';
 import {isArt,canWalk,colliders,edges,entrance,type Item,type Point} from './floor-plan';
 // A quarter-metre grid with swept collision checks: no cutting through table corners.
-export function createNavigator(items:Item[],outline:Point[],home:Point){
+export function createNavigator(items:Item[],outline:Point[],home:Point,options:{services?:boolean}={}){
  const obs=colliders(items),step=.25,minX=Math.ceil(Math.min(...outline.map(p=>p.x))/step),maxX=Math.floor(Math.max(...outline.map(p=>p.x))/step),minZ=Math.ceil(Math.min(...outline.map(p=>p.z))/step),maxZ=Math.floor(Math.max(...outline.map(p=>p.z))/step),width=maxX-minX+1;
  const valid=new Map<number,Point>();
  for(let z=minZ;z<=maxZ;z++)for(let x=minX;x<=maxX;x++){if(canWalk(x*step,z*step,obs,outline,.3))valid.set((z-minZ)*width+x-minX,{x:x*step,z:z*step});}
@@ -11,8 +12,8 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
  function search(start:Point,blocked:Point[]=[]){const safeAnchor=(p:Point)=>swept(start,p)&&blocked.every(o=>[.25,.5,.75,1].every(t=>Math.hypot(start.x+(p.x-start.x)*t-o.x,start.z+(p.z-start.z)*t-o.z)>=Math.min(.60,Math.hypot(start.x-o.x,start.z-o.z)-.00001)));let first=id(start);if(valid.has(first)&&!safeAnchor(valid.get(first)!)){const near=[...valid].filter(([,p])=>Math.hypot(p.x-start.x,p.z-start.z)<.55&&safeAnchor(p)).sort((a,b)=>Math.hypot(a[1].x-start.x,a[1].z-start.z)-Math.hypot(b[1].x-start.x,b[1].z-start.z))[0];first=near?.[0]??-1;}if(!valid.has(first))return{parents:new Map<number,number>(),first};const parents=new Map([[first,-1]]),queue=[first];for(let k=0;k<queue.length;k++){const cur=queue[k],p=valid.get(cur)!;for(const next of links.get(cur)??[]){const q=valid.get(next)!;if(!parents.has(next)&&blocked.every(o=>[.25,.5,.75,1].every(t=>Math.hypot(p.x+(q.x-p.x)*t-o.x,p.z+(q.z-p.z)*t-o.z)>=Math.min(.60,Math.hypot(p.x-o.x,p.z-o.z)-.00001)))){parents.set(next,cur);queue.push(next);}}}return{parents,first};}
  const component=search(home).parents,available=[...component.keys()].map(n=>valid.get(n)!);
  const goals:Point[]=[],services:{tableId:string;point:Point}[]=[];
- for(const item of items.filter(i=>['two','four','table','wideTable'].includes(i.kind))){const near=available.filter(p=>Math.hypot(p.x-item.x,p.z-item.z)<2).sort((a,b)=>Math.hypot(a.x-item.x,a.z-item.z)-Math.hypot(b.x-item.x,b.z-item.z))[0];if(near){services.push({tableId:item.id,point:near});if(Math.hypot(near.x-home.x,near.z-home.z)>.8&&!goals.some(g=>Math.hypot(g.x-near.x,g.z-near.z)<.8))goals.push(near);}}
- if(!goals.length){const far=available.sort((a,b)=>Math.hypot(b.x-home.x,b.z-home.z)-Math.hypot(a.x-home.x,a.z-home.z))[0];if(far&&Math.hypot(far.x-home.x,far.z-home.z)>1)goals.push(far);}
+ if(options.services!==false)for(const item of items.filter(i=>['two','four','table','wideTable'].includes(i.kind))){const near=available.filter(p=>Math.hypot(p.x-item.x,p.z-item.z)<2&&(!['table','wideTable'].includes(item.kind)||(()=>{const d=Math.hypot(p.x-item.x,p.z-item.z),f=Math.max(0,(d-.9)/d);return[.25,.5,.75,1].every(t=>canWalk(p.x+(item.x-p.x)*f*t,p.z+(item.z-p.z)*f*t,obs,outline,.3));})())).sort((a,b)=>Math.hypot(a.x-item.x,a.z-item.z)-Math.hypot(b.x-item.x,b.z-item.z))[0];if(near){services.push({tableId:item.id,point:near});if(Math.hypot(near.x-home.x,near.z-home.z)>.8&&!goals.some(g=>Math.hypot(g.x-near.x,g.z-near.z)<.8))goals.push(near);}}
+ if(options.services!==false&&!goals.length){const far=available.sort((a,b)=>Math.hypot(b.x-home.x,b.z-home.z)-Math.hypot(a.x-home.x,a.z-home.z))[0];if(far&&Math.hypot(far.x-home.x,far.z-home.z)>1)goals.push(far);}
  goals.push(home);
  const entry=entrance(outline),candidates:{edge:number;point:Point;door:Point;outside:Point;nx:number;nz:number;score:number;width:number;depth:number}[]=[];
  // Openings are architectural: seats and pictures must never move them.
@@ -23,6 +24,21 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
  const kitchens:typeof candidates=[];for(const c of candidates){if(kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<5))continue;kitchens.push(c);if(kitchens.length>=(outline.length>4?2:1))break;}
  const kitchen=kitchens[0]??null;
  const restroom=candidates.find(c=>!kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<4))??null;
+ // Major aisles should travel through usable interior space, rather than
+ // following a shortest grid path that hugs the wall and consumes every wall seat.
+ const wallEdges=edges(outline),clearanceCache=new Map<number,number>();
+ function widePath(start:Point,target:Point){
+  const {first}=search(start),last=id(target);if(!valid.has(first)||!valid.has(last))return[];
+  const parents=new Map([[first,-1]]),costs=new Map([[first,0]]),heap:{key:number;priority:number;cost:number}[]=[];
+  const push=(key:number,cost:number)=>{const p=valid.get(key)!,node={key,cost,priority:cost+Math.hypot(p.x-target.x,p.z-target.z)};heap.push(node);let n=heap.length-1;while(n){const parent=(n-1)>>1;if(heap[parent].priority<=node.priority)break;heap[n]=heap[parent];n=parent;}heap[n]=node;};
+  const pop=()=>{const best=heap[0],tail=heap.pop()!;if(heap.length){let n=0;while(n*2+1<heap.length){let child=n*2+1;if(child+1<heap.length&&heap[child+1].priority<heap[child].priority)child++;if(heap[child].priority>=tail.priority)break;heap[n]=heap[child];n=child;}heap[n]=tail;}return best;};
+  push(first,0);
+  while(heap.length){const current=pop();if(current.cost!==(costs.get(current.key)??Infinity))continue;if(current.key===last)return smooth(start,trace(start,last,parents,first),[]);
+   for(const next of links.get(current.key)??[]){const p=valid.get(next)!;let clearance=clearanceCache.get(next);if(clearance===undefined){clearance=Math.min(...wallEdges.map(e=>segmentDistance(p,e.a,e.b)));clearanceCache.set(next,clearance);}
+    const cost=current.cost+.25*(1+1/Math.pow(clearance+.2,2));if(cost>=(costs.get(next)??Infinity))continue;costs.set(next,cost);parents.set(next,current.key);push(next,cost);
+   }
+  }return[];
+ }
  function trace(start:Point,last:number,parents:Map<number,number>,first:number){if(!parents.has(last))return[];const route:Point[]=[];let n=last;while(n!==first){route.push(valid.get(n)!);n=parents.get(n)!;}const anchor=valid.get(first)!;if(!swept(start,anchor))return[];if(Math.hypot(anchor.x-start.x,anchor.z-start.z)>.001)route.push(anchor);return route.reverse();}
  // Round grid corners into sampled quadratic arcs; validate the entire swept disc.
  // Keep the original corner when an aisle is too tight for a safe curve.
@@ -40,5 +56,9 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
   }
   line(turns[turns.length-1]);return result;
  }
- return{goals,services,kitchen,kitchens,restroom,reachable:(p:Point,tolerance=.22)=>available.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<=tolerance),route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked);return smooth(start,trace(start,id(target),parents,first),blocked);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?smooth(start,trace(start,target.key,parents,first),blocked):[];},canMove:(p:Point)=>canWalk(p.x,p.z,obs,outline,.3)};
+ return{goals,services,kitchen,kitchens,restroom,aisleRoute:widePath,reachable:(p:Point,tolerance=.22)=>available.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<=tolerance),route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked),path=trace(start,id(target),parents,first),end=path.at(-1)??start;
+ // Portal coordinates need not fall on the navigation grid. Finish the safe
+ // final centimetres, otherwise a robot can keep returning short of the door.
+ if(parents.has(id(target))&&Math.hypot(target.x-end.x,target.z-end.z)>.00001&&swept(end,target)&&blocked.every(o=>[.25,.5,.75,1].every(t=>Math.hypot(end.x+(target.x-end.x)*t-o.x,end.z+(target.z-end.z)*t-o.z)>=.6)))path.push({...target});
+ return smooth(start,path,blocked);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?smooth(start,trace(start,target.key,parents,first),blocked):[];},canMove:(p:Point)=>canWalk(p.x,p.z,obs,outline,.3)};
 }

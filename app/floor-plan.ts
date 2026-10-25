@@ -21,7 +21,7 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  athens:{name:'アテナイの学堂',description:'ラファエロ / 壁に配置',w:2,d:.12,seats:0},
  logo:{name:'サイゼリヤのロゴ',description:'入口付近の壁用パネル',w:1.35,d:.12,seats:0},
  robot:{name:'配膳ロボット Servi',description:'最大5台。料理を配膳・回収して厨房へ',w:.49,d:.49,seats:0},
- serviceTable:{name:'取り分け・調味料台',description:'客席ではない小テーブル・調味料・メニュー・取り皿',w:1.05,d:.65,seats:0},
+ serviceTable:{name:'取り分け・調味料台',description:'客席ではない小テーブル・調味料・メニュー・取り皿',w:.82,d:.78,seats:0},
  drinkbar:{name:'ドリンクバー・給水機',description:'ドリンク・コーヒー・水・グラス',w:3.2,d:.85,seats:0},
  checkout:{name:'セルフレジ',description:'モニター・現金精算機・バーコード読取機',w:1.3,d:.7,seats:0},
  plant:{name:'観葉植物',description:'通路に緑を添える',w:.65,d:.65,seats:0}
@@ -56,4 +56,3 @@ export function snapPlacement(raw:Item,items:Item[],polygon:Point[]):Item{
  for(const e of edges(polygon)){const along=(raw.x-e.a.x)*e.tx+(raw.z-e.a.z)*e.tz;if(along<0||along>e.length)continue;const support=own.w/2*Math.abs(e.nx)+own.d/2*Math.abs(e.nz),distance=(raw.x-e.a.x)*e.nx+(raw.z-e.a.z)*e.nz,delta=support+.09-distance;if(Math.abs(delta)<.22)candidates.push({...raw,x:raw.x+e.nx*delta,z:raw.z+e.nz*delta});}
  const valid=candidates.filter(c=>!placementError(c,items,polygon));valid.sort((a,b)=>{const magnetic=(c:Item)=>c.x!==base.x||c.z!==base.z;return Number(magnetic(b))-Number(magnetic(a))||Math.hypot(a.x-raw.x,a.z-raw.z)-Math.hypot(b.x-raw.x,b.z-raw.z);});return valid[0]??base;
 }
-

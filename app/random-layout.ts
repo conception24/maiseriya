@@ -30,7 +30,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const t=Math.max(1.5,Math.min(e.length-1.5,(entry.x-e.a.x)*e.tx+(entry.z-e.a.z)*e.tz));
  if(add('checkout',e.a.x+e.tx*t+e.nx*.95,e.a.z+e.tz*t+e.nz*.95,(e.angle+360)%360))break checkout;
  }
- const initialDoors=createNavigator(items,outline,spawnPoint(outline,items));reserved=initialDoors.kitchens.map(k=>({x:k.door.x+k.nx*.9,z:k.door.z+k.nz*.9,w:k.width+1.1,d:2,rotation:edges(outline)[k.edge].angle}));
+ const initialDoors=createNavigator(items,outline,spawnPoint(outline,items));reserved=[...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].map(k=>({x:k.door.x+k.nx*.9,z:k.door.z+k.nz*.9,w:k.width+1.1,d:2.8,rotation:edges(outline)[k.edge].angle}));
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
  // Plan a connected main aisle before placing seating. Reserve a 1.5m swept strip
@@ -46,16 +46,6 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   const target=targets.shift()!;chosen.push(target);
   const path=aisleNav.route(aisleStart,target);
   for(let j=0;j<path.length;j+=6){const q=path[j];guestAisles.push({x:q.x,z:q.z,w:1.5,d:1.5,rotation:0});}
- }
- // A shared supply table is not a dining destination. Keep its front reachable
- // and reserve standing room before adding seats around it.
- supply:for(const e of edges(outline).filter(e=>e.i!==entry.i&&Math.abs(e.angle%90)<.01))for(let t=2;t<e.length-1;t+=1.25){
-  const x=e.a.x+t*e.tx+e.nx*.48,z=e.a.z+t*e.tz+e.nz*.48,rotation=(e.angle+360)%360;
-  const i:Item={id:'supply',kind:'serviceTable',x,z,rotation};
-  const front={x:x+e.nx*.85,z:z+e.nz*.85,w:1.2,d:1.05,rotation};
-  if(Math.hypot(x-entry.x,z-entry.z)<3||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||!rectInRoom(front,outline,.1)||items.some(o=>intersects(front,bounds(o))))continue;
-  if(!aisleNav.reachable({x:front.x,z:front.z},.3))continue;
-  if(add('serviceTable',x,z,rotation)){guestAisles.push(front);break supply;}
  }
  // Each seating zone is a short aligned run. The open side is reserved for guests.
  const cap=Math.min(32,Math.max(4,Math.floor(area(outline)/10.5)));
@@ -130,6 +120,30 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   if(seat('two',p.x-dx,p.z-dz,p.rotation,1)&&seat('two',p.x+dx,p.z+dz,p.rotation,1))continue;
   items.splice(before);guestAisles.splice(aisleCount);
  }
+ // Keep a small-party option when door clearances consume the two-person run.
+ if(!items.some(i=>i.kind==='two')){
+  const booths=items.filter(i=>i.kind==='four');
+  const single=booths.find(i=>!booths.some(j=>j!==i&&Math.hypot(i.x-j.x,i.z-j.z)<2.4))??booths.at(-1);
+  if(single)single.kind='two';
+ }
+ // Use leftover wall/booth-end pockets, keeping the customer approach open.
+ const supplyCandidates:{x:number;z:number;rotation:number;score:number}[]=[];
+ const furniture=items.filter(i=>['two','four','partition'].includes(i.kind));
+ for(const e of edges(outline).filter(e=>e.i!==entry.i&&Math.abs(e.angle%90)<.01))for(let t=.75;t<e.length-.75;t+=.25){
+  const x=e.a.x+t*e.tx+e.nx*.53,z=e.a.z+t*e.tz+e.nz*.53,rotation=(e.angle+360)%360;
+  const distance=Math.min(...furniture.map(i=>Math.hypot(x-i.x,z-i.z)));
+  supplyCandidates.push({x,z,rotation,score:Math.abs(distance-1.6)});
+ }
+ const supplyNav=createNavigator(items,outline,spawnPoint(outline,items));
+ for(const {x,z,rotation} of supplyCandidates.sort((a,b)=>a.score-b.score)){
+  const i:Item={id:'supply',kind:'serviceTable',x,z,rotation},a=rotation*Math.PI/180;
+  const front={x:x-Math.sin(a)*.85,z:z+Math.cos(a)*.85,w:1,d:1.05,rotation};
+  if(Math.hypot(x-entry.x,z-entry.z)<3||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||!rectInRoom(front,outline,.1)||items.some(o=>intersects(front,bounds(o)))||!supplyNav.reachable(front,.3))continue;
+  if(placementError(i,items,outline))continue;
+  const next=[...items,i],check=createNavigator(next,outline,spawnPoint(outline,next));
+  if(!next.filter(t=>['two','four'].includes(t.kind)).every(t=>customerSeatAccess(t,check)))continue;
+  add('serviceTable',x,z,rotation);guestAisles.push(front);break;
+ }
  const spawn=spawnPoint(outline,items);
  // Recheck both bench/chair approaches from the entrance, not just a point near the table.
  const access=createNavigator(items,outline,spawn);
@@ -152,9 +166,10 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  // Put the brand beside the entrance before distributing other pictures.
  for(const distance of[1.9,-1.9,2.6,-2.6,3.3,-3.3]){const logo=snapArt({id:`random-${serial++}`,kind:'logo',x:entry.x+entry.tx*distance,z:entry.z+entry.tz*distance,rotation:0},outline);if(!placementError(logo,items,outline)&&!openings.some(k=>intersects(bounds(logo),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle}))){items.push(logo);break;}}
 
+ const behindBar=(art:Item)=>items.some(b=>b.kind==='drinkbar'&&intersects(bounds(art),{...bounds(b),d:1.3,w:3.45}));
  const artworks:Kind[]=['venus','primavera','cherubs','adam','annunciation','athens'];
  const candidates:Item[]=[];
- for(const e of edges(outline))for(let t=1.7;t<e.length-1.5;t+=4.5){const art=snapArt({id:`random-${serial++}`,kind:artworks[Math.floor(random()*artworks.length)],x:e.a.x+t*e.tx,z:e.a.z+t*e.tz,rotation:0},outline);if(openings.some(k=>intersects(bounds(art),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle})))continue;if(!placementError(art,items,outline))candidates.push(art);}
+ for(const e of edges(outline))for(let t=1.7;t<e.length-1.5;t+=4.5){const art=snapArt({id:`random-${serial++}`,kind:artworks[Math.floor(random()*artworks.length)],x:e.a.x+t*e.tx,z:e.a.z+t*e.tz,rotation:0},outline);if(openings.some(k=>intersects(bounds(art),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle})))continue;if(!behindBar(art)&&!placementError(art,items,outline))candidates.push(art);}
  const limit=Math.min(8,Math.max(3,Math.round(outline.reduce((sum,p,n)=>sum+Math.hypot(p.x-outline[(n+1)%outline.length].x,p.z-outline[(n+1)%outline.length].z),0)/14)));
  while(candidates.length&&items.filter(i=>isArt(i.kind)).length<limit){const art=candidates.splice(Math.floor(random()*candidates.length),1)[0];if(!placementError(art,items,outline))items.push(art);}
  return {...layout,items};

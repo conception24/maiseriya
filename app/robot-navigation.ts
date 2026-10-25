@@ -15,7 +15,10 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
  if(!goals.length){const far=available.sort((a,b)=>Math.hypot(b.x-home.x,b.z-home.z)-Math.hypot(a.x-home.x,a.z-home.z))[0];if(far&&Math.hypot(far.x-home.x,far.z-home.z)>1)goals.push(far);}
  goals.push(home);
  const entry=entrance(outline),candidates:{edge:number;point:Point;door:Point;outside:Point;nx:number;nz:number;score:number;width:number;depth:number}[]=[];
- for(const e of edges(outline)){if(e.i===entry.i||e.length<1.5)continue;for(const p of available){const t=(p.x-e.a.x)*e.tx+(p.z-e.a.z)*e.tz,dist=(p.x-e.a.x)*e.nx+(p.z-e.a.z)*e.nz;if(t<.75||t>e.length-.75||dist<.4||dist>.8)continue;const door={x:e.a.x+t*e.tx,z:e.a.z+t*e.tz};if(items.some(i=>!isArt(i.kind)&&i.kind!=='robot'&&Math.hypot(i.x-door.x,i.z-door.z)<1.1))continue;const approach={x:door.x+e.nx*.4,z:door.z+e.nz*.4};if(!swept(p,approach))continue;candidates.push({edge:e.i,point:p,door,width:1.1+(e.i%3)*.12,depth:1.2+(e.i%3)*.4,outside:{x:door.x-e.nx*.85,z:door.z-e.nz*.85},nx:e.nx,nz:e.nz,score:Math.hypot(door.x-entry.x,door.z-entry.z)});}}
+ // Openings are architectural: seats and pictures must never move them.
+ const fixtures=colliders(items.filter(i=>i.kind==='checkout'));
+ for(const e of edges(outline)){if(e.i===entry.i||e.length<1.5)continue;for(let t=.75;t<=e.length-.75;t+=.25){const door={x:e.a.x+t*e.tx,z:e.a.z+t*e.tz},p={x:door.x+e.nx*.75,z:door.z+e.nz*.75};if(!canWalk(p.x,p.z,fixtures,outline,.3)||items.some(i=>i.kind==='checkout'&&Math.hypot(i.x-door.x,i.z-door.z)<1.1))continue;candidates.push({edge:e.i,point:p,door,width:1.1+(e.i%3)*.12,depth:1.2+(e.i%3)*.4,outside:{x:door.x-e.nx*.85,z:door.z-e.nz*.85},nx:e.nx,nz:e.nz,score:Math.hypot(door.x-entry.x,door.z-entry.z)});}}
+
  const checkout=items.find(i=>i.kind==='checkout');candidates.sort((a,b)=>checkout?Math.hypot(a.door.x-checkout.x,a.door.z-checkout.z)-Math.hypot(b.door.x-checkout.x,b.door.z-checkout.z):b.score-a.score);
  const kitchens:typeof candidates=[];for(const c of candidates){if(kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<5))continue;kitchens.push(c);if(kitchens.length>=(outline.length>4?2:1))break;}
  const kitchen=kitchens[0]??null;
@@ -39,4 +42,3 @@ export function createNavigator(items:Item[],outline:Point[],home:Point){
  }
  return{goals,services,kitchen,kitchens,restroom,reachable:(p:Point,tolerance=.22)=>available.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<=tolerance),route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked);return smooth(start,trace(start,id(target),parents,first),blocked);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?smooth(start,trace(start,target.key,parents,first),blocked):[];},canMove:(p:Point)=>canWalk(p.x,p.z,obs,outline,.3)};
 }
-

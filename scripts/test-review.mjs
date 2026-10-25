@@ -44,3 +44,21 @@ for(const {layout} of results){
  for(const bar of layout.items.filter(i=>i.kind==='drinkbar'))assert(layout.items.filter(i=>isArt(i.kind)).every(i=>!intersects(bounds(i),{...bounds(bar),d:1.3,w:3.45})),'no art hidden behind drinkbar');
 }
 console.log('PASS: fixed kitchen/WC openings, clear approaches, no hidden drinkbar artwork, shared two-person table dimensions.');
+
+// Prefetch is single-flight, cached answers do not wait for another generation,
+// and the newest feedback weights choose among the already prepared candidates.
+const {ReviewPrefetch}=await import('../work/model-test/review-prefetch.mjs');
+const {preferenceScore}=await import('../work/model-test/layout-review.mjs');
+let loads=0,cancels=0,resolveBatch,rejectBatch;const statuses=[];
+const pool=new ReviewPrefetch(()=>{loads++;return{promise:new Promise((resolve,reject)=>{resolveBatch=resolve;rejectBatch=reject;}),cancel:()=>{cancels++;rejectBatch(Error('cancelled'));}};},s=>statuses.push(s));
+const pending=pool.prepare();assert.equal(pool.prepare(),pending);assert.equal(loads,1);
+const prepared=results.map((p,n)=>({...p,layout:{...p.layout,chairStyle:n%2?'woven':'gray'},assessment:{...p.assessment,density:.2+n*.2,dividers:1-n*.25}}));
+resolveBatch(prepared);await pending;assert.equal(statuses.at(-1).ready,prepared.length);
+const latest={...defaultPreferences,density:2.5,dividers:.35};
+const expected=[...prepared].sort((a,b)=>preferenceScore(b.assessment,latest)-preferenceScore(a.assessment,latest))[0];
+const cached=await pool.take(latest);assert.equal(cached.layout,expected.layout);assert.equal(loads,1);assert.equal(cached.assessment.score,preferenceScore(expected.assessment,latest));
+while(statuses.at(-1).ready>1)await pool.take(latest);
+assert.equal(loads,2);pool.dispose();await new Promise(resolve=>setImmediate(resolve));assert.equal(cancels,1);await assert.rejects(pool.take(latest));
+let rejectEarly;const early=new ReviewPrefetch(()=>({promise:new Promise((resolve,reject)=>{rejectEarly=reject;}),cancel:()=>rejectEarly(Error('closed'))}));
+const waiting=early.take(latest);early.dispose();await assert.rejects(waiting);
+console.log('PASS: single background worker, cached next question, latest-weight ranking, bounded refill, close cancellation and pending-answer cancellation.');

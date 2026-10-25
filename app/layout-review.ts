@@ -28,6 +28,9 @@ export function toggleAnswer(selected:AnswerSelection[],answer:AnswerSelection):
  return[...selected.filter(a=>a.id!=='good'&&a.id!=='unsure'),answer];
 }
 
+export function preferenceScore(a:Omit<Assessment,'score'>,weights:Preferences):number{
+ return(a.density*weights.density+a.order*weights.order+a.coverage*weights.coverage+a.wall*weights.wall+a.dividers*weights.dividers)*20-Math.abs(a.density-.8)*40-a.blocked*1000;
+}
 export function assess(layout:Layout,weights:Preferences=defaultPreferences):Assessment{
  const tables=layout.items.filter(i=>i.kind==='two'||i.kind==='four'),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items));
  const blocked=tables.filter(i=>!customerSeatAccess(i,nav)).length+layout.items.filter(i=>['serviceTable','drinkbar','checkout'].includes(i.kind)&&!nav.reachable({x:i.x-Math.sin(i.rotation*Math.PI/180)*.85,z:i.z+Math.cos(i.rotation*Math.PI/180)*.85},.3)).length;
@@ -41,7 +44,7 @@ export function assess(layout:Layout,weights:Preferences=defaultPreferences):Ass
   if(distance>1.4)unused++;
  }
  const dividers=Math.min(1,layout.items.filter(i=>i.kind==='partition').length/Math.max(6,area(layout.outline)/15));
- const coverage=1-unused/Math.max(1,samples),score=(density*weights.density+order*weights.order+coverage*weights.coverage+wall*weights.wall+dividers*weights.dividers)*20-Math.abs(density-.8)*40-blocked*1000;
+ const coverage=1-unused/Math.max(1,samples),score=preferenceScore({density,order,coverage,wall,dividers,blocked,tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0)},weights);
  return{tables:tables.length,seats:tables.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,dividers,score};
 }
 export function proposals(layout:Layout,weights:Preferences=defaultPreferences,random=Math.random):Proposal[]{

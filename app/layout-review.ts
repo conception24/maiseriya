@@ -19,7 +19,14 @@ export const ISSUE_OPTIONS=[
  {id:'seat-mix',label:'二人席・団体席の割合がおかしい'}, {id:'wall-route',label:'追加壁が通路や席のまとまりを作れていない'}
 ] as const;
 export type AnswerId=typeof ISSUE_OPTIONS[number]['id']|'good'|'unsure'|'other';
-export type Feedback={answer:AnswerId;label:string;note:string;at:string;proposal:Proposal};
+export type AnswerSelection={id:AnswerId;label:string;addOption?:boolean};
+export type Feedback={answers:AnswerSelection[];note:string;at:string;proposal:Proposal};
+export function toggleAnswer(selected:AnswerSelection[],answer:AnswerSelection):AnswerSelection[]{
+ const same=(a:AnswerSelection)=>a.id===answer.id&&a.label===answer.label;
+ if(selected.some(same))return selected.filter(a=>!same(a));
+ if(answer.id==='good'||answer.id==='unsure')return[answer];
+ return[...selected.filter(a=>a.id!=='good'&&a.id!=='unsure'),answer];
+}
 
 export function assess(layout:Layout,weights:Preferences=defaultPreferences):Assessment{
  const tables=layout.items.filter(i=>i.kind==='two'||i.kind==='four'),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items));
@@ -51,8 +58,12 @@ export function learn(weights:Preferences,feedback:Feedback):Preferences{
   'many-tables':{density:-.18},'few-tables':{density:.18},
   'empty-space':{coverage:.18},'unaligned':{order:.2},'wall-seats':{wall:.2},'wall-route':{wall:.2}
  };
- for(const [key,value] of Object.entries(changes[feedback.answer]??{})){
-  const k=key as keyof Preferences;next[k]=Math.max(.35,Math.min(2.5,next[k]+value!));
+ const deltas:Partial<Preferences>={};
+ const seen=new Set<AnswerId>();
+ for(const answer of feedback.answers){if(seen.has(answer.id))continue;seen.add(answer.id);
+  for(const [key,value] of Object.entries(changes[answer.id]??{})){const k=key as keyof Preferences;deltas[k]=(deltas[k]??0)+value!;}
  }
+ for(const [key,value] of Object.entries(deltas)){const k=key as keyof Preferences;next[k]=Math.max(.35,Math.min(2.5,next[k]+Math.max(-.22,Math.min(.22,value!))));}
+
  return next;
 }

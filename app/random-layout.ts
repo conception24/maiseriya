@@ -24,7 +24,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  if(intersects(bounds(i),{x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle})||reserved.some(r=>intersects(bounds(i),r)))return false;
  // Touching booth backs must have identical centres along the bench, never a partial overlap.
  if(kind==='four'&&items.some(o=>{if(o.kind!=='four'||o.rotation%180!==rotation%180)return false;const a=rotation*Math.PI/180,dx=x-o.x,dz=z-o.z,along=Math.abs(dx*Math.cos(a)+dz*Math.sin(a)),back=Math.abs(-dx*Math.sin(a)+dz*Math.cos(a));return back<2.35&&back>2.2&&along>.01&&along<1.95;}))return false;
- }if(['four','two'].includes(kind)&&items.some(c=>['checkout','drinkbar'].includes(c.kind)&&intersects(bounds(i),{x:c.x-Math.sin(c.rotation*Math.PI/180)*.9,z:c.z+Math.cos(c.rotation*Math.PI/180)*.9,w:CATALOG[c.kind].w,d:1.1,rotation:c.rotation})))return false;if(kind==='drinkbar'&&reserved.some(r=>intersects(bounds(i),r)))return false;if(!placementError(i,items,outline)){items.push(i);return true;}return false;};
+ }if(['four','two'].includes(kind)&&items.some(c=>['checkout','drinkbar','serviceTable'].includes(c.kind)&&intersects(bounds(i),{x:c.x-Math.sin(c.rotation*Math.PI/180)*.9,z:c.z+Math.cos(c.rotation*Math.PI/180)*.9,w:CATALOG[c.kind].w,d:1.1,rotation:c.rotation})))return false;if(kind==='drinkbar'&&reserved.some(r=>intersects(bounds(i),r)))return false;if(!placementError(i,items,outline)){items.push(i);return true;}return false;};
  // Reserve a checkout beside, rather than directly in, the entrance route.
  checkout:for(const e of edges(outline).filter(e=>e.i!==entry.i&&Math.abs(e.angle%90)<.01&&e.length>3).sort((a,b)=>Math.hypot((a.a.x+a.b.x)/2-entry.x,(a.a.z+a.b.z)/2-entry.z)-Math.hypot((b.a.x+b.b.x)/2-entry.x,(b.a.z+b.b.z)/2-entry.z))){
  const t=Math.max(1.5,Math.min(e.length-1.5,(entry.x-e.a.x)*e.tx+(entry.z-e.a.z)*e.tz));
@@ -33,6 +33,30 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const initialDoors=createNavigator(items,outline,spawnPoint(outline,items));reserved=initialDoors.kitchens.map(k=>({x:k.door.x+k.nx*.9,z:k.door.z+k.nz*.9,w:k.width+1.1,d:2,rotation:edges(outline)[k.edge].angle}));
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
+ // Plan a connected main aisle before placing seating. Reserve a 1.5m swept strip
+ // (three robot bodies) along entrance-to-interior routes, including split rooms.
+ const aisleStart=spawnPoint(outline,items),aisleNav=createNavigator(items,outline,aisleStart);
+ const targets:Point[]=[];
+ for(let z=minZ+2;z<maxZ-1;z+=2)for(let x=minX+2;x<maxX-1;x+=2)
+  if(rectInRoom({x,z,w:2,d:2,rotation:0},outline,.1)&&aisleNav.reachable({x,z},.3))targets.push({x,z});
+ const clearance=(p:Point)=>Math.min(...edges(outline).map(e=>{const t=Math.max(0,Math.min(e.length,(p.x-e.a.x)*e.tx+(p.z-e.a.z)*e.tz));return Math.hypot(p.x-e.a.x-e.tx*t,p.z-e.a.z-e.tz*t);}));
+ const chosen:Point[]=[];
+ for(let n=0;n<(outline.length>4?2:1)&&targets.length;n++){
+  targets.sort((a,b)=>Math.min(...[aisleStart,...chosen].map(p=>Math.hypot(b.x-p.x,b.z-p.z)))*clearance(b)-Math.min(...[aisleStart,...chosen].map(p=>Math.hypot(a.x-p.x,a.z-p.z)))*clearance(a));
+  const target=targets.shift()!;chosen.push(target);
+  const path=aisleNav.route(aisleStart,target);
+  for(let j=0;j<path.length;j+=6){const q=path[j];guestAisles.push({x:q.x,z:q.z,w:1.5,d:1.5,rotation:0});}
+ }
+ // A shared supply table is not a dining destination. Keep its front reachable
+ // and reserve standing room before adding seats around it.
+ supply:for(const e of edges(outline).filter(e=>e.i!==entry.i&&Math.abs(e.angle%90)<.01))for(let t=2;t<e.length-1;t+=1.25){
+  const x=e.a.x+t*e.tx+e.nx*.48,z=e.a.z+t*e.tz+e.nz*.48,rotation=(e.angle+360)%360;
+  const i:Item={id:'supply',kind:'serviceTable',x,z,rotation};
+  const front={x:x+e.nx*.85,z:z+e.nz*.85,w:1.2,d:1.05,rotation};
+  if(Math.hypot(x-entry.x,z-entry.z)<3||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||!rectInRoom(front,outline,.1)||items.some(o=>intersects(front,bounds(o))))continue;
+  if(!aisleNav.reachable({x:front.x,z:front.z},.3))continue;
+  if(add('serviceTable',x,z,rotation)){guestAisles.push(front);break supply;}
+ }
  // Each seating zone is a short aligned run. The open side is reserved for guests.
  const cap=Math.min(32,Math.max(4,Math.floor(area(outline)/10.5)));
  const guestSide=(seat:Item,side:number)=>{const a=seat.rotation*Math.PI/180,d=CATALOG[seat.kind].w/2+.48;return{x:seat.x+Math.cos(a)*d*side,z:seat.z+Math.sin(a)*d*side,w:.8,d:CATALOG[seat.kind].d,rotation:seat.rotation};};
@@ -72,8 +96,9 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   const entryClear={x:entry.x+entry.nx*1.65,z:entry.z+entry.nz*1.65,w:3.2,d:3.3,rotation:entry.angle};
   const existing=items.filter(i=>!isArt(i.kind));
   for(let n=0;n<zone.length;n++){const i=zone[n];
+   if(i.kind==='four'&&[...items,...zone.slice(0,n)].some(o=>{if(o.kind!=='four'||o.rotation%180!==i.rotation%180)return false;const a=i.rotation*Math.PI/180,dx=i.x-o.x,dz=i.z-o.z,along=Math.abs(dx*Math.cos(a)+dz*Math.sin(a)),back=Math.abs(-dx*Math.sin(a)+dz*Math.cos(a));return back<2.35&&back>2.2&&along>.01&&along<1.95;}))return false;
    if(placementError(i,[...items,...zone.slice(0,n)],outline)||reserved.some(r=>intersects(bounds(i),r))||intersects(bounds(i),entryClear)||guestAisles.some(r=>intersects(bounds(i),r)))return false;
-   if(existing.some(o=>['checkout','drinkbar'].includes(o.kind)&&intersects(bounds(i),{x:o.x-Math.sin(o.rotation*Math.PI/180)*.9,z:o.z+Math.cos(o.rotation*Math.PI/180)*.9,w:CATALOG[o.kind].w,d:1.1,rotation:o.rotation})))return false;
+   if(existing.some(o=>['checkout','drinkbar','serviceTable'].includes(o.kind)&&intersects(bounds(i),{x:o.x-Math.sin(o.rotation*Math.PI/180)*.9,z:o.z+Math.cos(o.rotation*Math.PI/180)*.9,w:CATALOG[o.kind].w,d:1.1,rotation:o.rotation})))return false;
   }
   if(aisles.some(r=>!rectInRoom(r,outline,.1)||[...existing,...zone].some(i=>intersects(r,bounds(i)))))return false;
   const next=[...items,...zone],nav=createNavigator(next,outline,spawnPoint(outline,next));
@@ -83,7 +108,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  // Search the whole floor, not just its centre line. A random offset and module palette
  // change the floor plan itself; distance scoring gives the largest usable gaps priority.
  const zoneCandidates:{x:number;z:number;rotation:number;score:number}[]=[];
- const ox=random(),oz=random(),preferred=random()<.5?0:90;
+ const ox=Math.round(random()*2)*.45,oz=Math.round(random()*2)*.45,preferred=random()<.5?0:90;
  for(let z=minZ+2+oz;z<maxZ-2;z+=.9)for(let x=minX+2+ox;x<maxX-2;x+=.9){
   if(!rectInRoom({x,z,w:1,d:1,rotation:0},outline,.1))continue;
   const distance=Math.min(...items.filter(i=>!isArt(i.kind)).map(i=>Math.hypot(x-i.x,z-i.z)));
@@ -92,9 +117,19 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  zoneCandidates.sort((a,b)=>b.score-a.score);
  const palettes:[ZoneKind|null,ZoneKind|null][] = random()<.5?[['four','four'],['two','four'],['four',null],[null,'two']]:[['four','two'],['four','four'],[null,'four'],['two',null]];
  const corner=random()<.65;let islands=0;
- for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/90)))break;
+ for(const [left,right] of palettes){for(const p of zoneCandidates){if(islands>=Math.max(2,Math.ceil(area(outline)/65)))break;
   if(island(p.x,p.z,p.rotation,left,right,corner)){islands++;}
  }}
+ // Fill residual dining pockets with an aligned pair of two-person tables.
+ // Commit the entire pair or nothing; keep the planned aisles and chair approaches.
+ for(const p of zoneCandidates){
+  if(items.filter(i=>i.kind==='two'||i.kind==='four').length+2>cap)break;
+  if(Math.min(...items.filter(i=>['two','four'].includes(i.kind)).map(i=>Math.hypot(i.x-p.x,i.z-p.z)))<2.2)continue;
+  const a=p.rotation*Math.PI/180,dx=-Math.sin(a)*1.3,dz=Math.cos(a)*1.3;
+  const before=items.length,aisleCount=guestAisles.length;
+  if(seat('two',p.x-dx,p.z-dz,p.rotation,1)&&seat('two',p.x+dx,p.z+dz,p.rotation,1))continue;
+  items.splice(before);guestAisles.splice(aisleCount);
+ }
  const spawn=spawnPoint(outline,items);
  // Recheck both bench/chair approaches from the entrance, not just a point near the table.
  const access=createNavigator(items,outline,spawn);

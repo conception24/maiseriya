@@ -1,8 +1,8 @@
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar';
+export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside'};
-export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'gray'|'perforated';foodEnabled?:boolean;invertX?:boolean;invertY?:boolean};
+export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'gray'|'perforated';foodEnabled?:boolean;drinkbarStyle?:'wood'|'tile';invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
 export type Rect = {x:number;z:number;w:number;d:number;rotation:number};
 export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:number;seats:number}>={
@@ -21,7 +21,8 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  athens:{name:'アテナイの学堂',description:'ラファエロ / 壁に配置',w:2,d:.12,seats:0},
  logo:{name:'サイゼリヤのロゴ',description:'入口付近の壁用パネル',w:1.35,d:.12,seats:0},
  robot:{name:'配膳ロボット Servi',description:'最大5台。料理を配膳・回収して厨房へ',w:.49,d:.49,seats:0},
- drinkbar:{name:'ドリンクバー・給水機',description:'ドリンク・コーヒー・水・グラス',w:2.4,d:.75,seats:0},
+ serviceTable:{name:'取り分け・調味料台',description:'客席ではない小テーブル・調味料・メニュー・取り皿',w:1.05,d:.65,seats:0},
+ drinkbar:{name:'ドリンクバー・給水機',description:'ドリンク・コーヒー・水・グラス',w:3.2,d:.85,seats:0},
  checkout:{name:'セルフレジ',description:'モニター・現金精算機・バーコード読取機',w:1.3,d:.7,seats:0},
  plant:{name:'観葉植物',description:'通路に緑を添える',w:.65,d:.65,seats:0}
 };
@@ -40,7 +41,7 @@ export function initialItems():Item[]{const list:Item[]=[];for(const x of [-4.5,
 export function parseLayout(value:unknown,polygon=DEFAULT_OUTLINE):Item[]{if(!Array.isArray(value)||value.length>150)throw Error('Invalid layout');const seen=new Set<string>();const result:Item[]=[];for(const v of value){if(!v||typeof v!=='object')throw Error('Invalid item');const i=v as Item;if(typeof i.id!=='string'||i.id.length>100||seen.has(i.id)||!Object.hasOwn(CATALOG,i.kind)||!Number.isFinite(i.x)||!Number.isFinite(i.z)||!Number.isFinite(i.rotation)||(!isArt(i.kind)&&![0,90,180,270].includes(i.rotation)))throw Error('Invalid item');if(i.side!==undefined&&(i.kind!=='logo'||!['inside','outside'].includes(i.side)))throw Error('Invalid panel side');const clean:Item={id:i.id,kind:i.kind,x:i.x,z:i.z,rotation:i.rotation,...(i.side?{side:i.side}:{})};if(placementError(clean,result,polygon))throw Error('Invalid placement');seen.add(i.id);result.push(clean);}return result;}
 
 export function initialLayout():Layout{return{items:initialItems(),outline:DEFAULT_OUTLINE.map(p=>({...p})),chairStyle:'gray',foodEnabled:true};}
-export function parseDocument(v:unknown):Layout{if(!v||typeof v!=='object')throw Error('Invalid file');const d=v as Layout&{version:number};if(![1,2].includes(d.version))throw Error('Version');for(const key of ['invertX','invertY'] as const)if(d[key]!==undefined&&typeof d[key]!=='boolean')throw Error('Look setting');if(d.foodEnabled!==undefined&&typeof d.foodEnabled!=='boolean')throw Error('Food setting');const outline=d.outline??DEFAULT_OUTLINE;if(outlineError(outline))throw Error('Outline');if(d.chairStyle!==undefined&&!['gray','woven','perforated'].includes(d.chairStyle))throw Error('Style');return{outline:outline.map(p=>({x:p.x,z:p.z})),items:parseLayout(d.items,outline),chairStyle:d.chairStyle??'woven',foodEnabled:d.foodEnabled??true,invertX:d.invertX??true,invertY:d.invertY??true};}
+export function parseDocument(v:unknown):Layout{if(!v||typeof v!=='object')throw Error('Invalid file');const d=v as Layout&{version:number};if(![1,2].includes(d.version))throw Error('Version');for(const key of ['invertX','invertY'] as const)if(d[key]!==undefined&&typeof d[key]!=='boolean')throw Error('Look setting');if(d.foodEnabled!==undefined&&typeof d.foodEnabled!=='boolean')throw Error('Food setting');if(d.drinkbarStyle!==undefined&&!['wood','tile'].includes(d.drinkbarStyle))throw Error('Drinkbar style');const outline=d.outline??DEFAULT_OUTLINE;if(outlineError(outline))throw Error('Outline');if(d.chairStyle!==undefined&&!['gray','woven','perforated'].includes(d.chairStyle))throw Error('Style');return{outline:outline.map(p=>({x:p.x,z:p.z})),items:parseLayout(d.items,outline),chairStyle:d.chairStyle??'woven',foodEnabled:d.foodEnabled??true,drinkbarStyle:d.drinkbarStyle??'wood',invertX:d.invertX??false,invertY:d.invertY??false};}
 
 // Magnetic edge alignment overrides the coarse grid near another object or wall.
 export function snapPlacement(raw:Item,items:Item[],polygon:Point[]):Item{

@@ -74,6 +74,13 @@ export function createTableMeal(index:number,width:number,mode:'table'|'cargo'|'
  const wine=index%8===0||index%8===5,white=index%8===5;
  const gx=right,gz=large?.025:-.03;
  if(wine){disc(.029,.004,glassMat,root,gx,.003,gz);disc(.003,.055,glassMat,root,gx,.03,gz);mesh(new T.LatheGeometry([[.004,.055],[.025,.065],[.034,.09],[.029,.13],[.027,.13],[.032,.09],[.023,.068],[.004,.058]].map(([a,b])=>new T.Vector2(a,b)),28),glassMat,root,gx,0,gz);disc(.027,.023,material(white?'#e6d58e':'#6e1930',.23),root,gx,.082,gz);}
+ else if(index%8===2||index%8===6){
+  // Tall handled beer mug with a thick base, golden beer and a soft white head.
+  const mug=new T.Group();mug.position.set(gx,0,gz);root.add(mug);
+  mesh(new T.LatheGeometry([[0,0],[.04,0],[.042,.012],[.039,.18],[.035,.18],[.035,.017],[0,.017]].map(([a,b])=>new T.Vector2(a,b)),28),glassMat,mug);
+  disc(.034,.126,material('#d99a19',.2),mug,0,.08);disc(.035,.031,material('#fff4d9',.8),mug,0,.158);
+  const handle=mesh(new T.TorusGeometry(.043,.007,8,20,Math.PI*1.55),glassMat,mug,-.04,.085,0);handle.rotation.z=Math.PI*.225;
+ }
  else {mesh(new T.LatheGeometry([[.025,0],[.03,.005],[.036,.095],[.033,.095],[.027,.009]].map(([a,b])=>new T.Vector2(a,b)),24),glassMat,root,gx,0,gz);const liquid=new T.MeshStandardMaterial({color:index%3===0?'#ed9b23':'#c7e3ea',roughness:.23,transparent:true,opacity:index%3===0?.85:.4});disc(.03,.055,liquid,root,gx,.033,gz);}
  // Only a quarter of tables have a magnum; the others may order glasses or soft drinks.
  if(index%8!==0&&index%8!==5)return root;

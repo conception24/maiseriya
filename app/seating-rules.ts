@@ -1,5 +1,5 @@
 import {rectInRoom,intersects} from './geometry';
-import {bounds,isArt,type Item,type Point,type Rect} from './floor-plan';
+import {CATALOG,bounds,isArt,type Item,type Point,type Rect} from './floor-plan';
 import type {createNavigator} from './robot-navigation';
 // The bench seam grid (1.84m) is independent from the 0.82m table grid.
 export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:number[]){
@@ -44,4 +44,29 @@ export function benchRearHandrail(item:Item,items:Item[],outline:Point[]):boolea
 }
 export function dividerHandrail(item:Item,outline:Point[]):boolean{
  return rectInRoom({...bounds(item),d:1},outline,.1);
+}
+
+// Both seats/bench ends must open onto one connected, guest-sized approach strip.
+export function customerSeatAccess(item:Item,nav:ReturnType<typeof createNavigator>){
+ const a=item.rotation*Math.PI/180,side=CATALOG[item.kind].w/2+.4;
+ return [-1,1].some(sign=>[-.72,0,.72].every(z=>nav.reachable({x:item.x+Math.cos(a)*side*sign-Math.sin(a)*z,z:item.z+Math.sin(a)*side*sign+Math.cos(a)*z},.22)));
+}
+
+// Keep the original 1.8m editable footprint/import format. Close only tiny,
+// inaccessible construction joints between aligned fixed walls and columns.
+export function dividerSpan(item:Item,items:Item[]){
+ const a=item.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a),half=CATALOG.dividerWall.w/2;
+ const extension=(side:number)=>{
+  let nearest=Infinity;
+  for(const other of items){
+   if(other===item||!['dividerWall','pillar'].includes(other.kind)||other.kind==='dividerWall'&&other.rotation%180!==item.rotation%180)continue;
+   const dx=other.x-item.x,dz=other.z-item.z,along=(dx*c+dz*s)*side,cross=-dx*s+dz*c;
+   if(along<=0||Math.abs(cross)>.001)continue;
+   const gap=along-half-CATALOG[other.kind].w/2;
+   if(gap>=-.0001&&gap<=.06)nearest=Math.min(nearest,Math.max(0,gap)*(other.kind==='pillar'?1:.5));
+  }
+  return Number.isFinite(nearest)?nearest:0;
+ };
+ const left=extension(-1),right=extension(1);
+ return{width:half*2+left+right,offset:(right-left)/2};
 }

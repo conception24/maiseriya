@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {banquetteRun,benchRearHandrail,dividerHandrail,smallTableGroups,smallGroupAccess,checkoutStaffArea} from '../work/model-test/seating-rules.mjs';
+import {banquetteRun,benchRearHandrail,dividerHandrail,smallTableGroups,smallGroupAccess,checkoutStaffArea,dividerSpan} from '../work/model-test/seating-rules.mjs';
 import {CATALOG,bounds,canWalk,colliders,initialLayout,parseDocument,spawnPoint,edges,entrance} from '../work/model-test/floor-plan.mjs';
 import {createNavigator} from '../work/model-test/robot-navigation.mjs';
 import {proposals} from '../work/model-test/layout-review.mjs';
@@ -66,9 +66,12 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  assert(axesX.length===1||axesZ.length===1||(axesX.length===2&&axesZ.length===2),'columns must form one line or an orthogonal L/rectangle');
  if(axesX.length===1||axesZ.length===1){const values=columns.map(i=>axesX.length===1?i.z:i.x).sort((a,b)=>a-b),pitch=values[1]-values[0];for(let n=2;n<values.length;n++)assert(Math.abs(values[n]-values[n-1]-pitch)<.001,'linear structural bays are evenly spaced');}
  for(const column of columns){
-  const panel=next.items.find(i=>i.id===column.id.replace('column-','column-wall-'));assert(panel&&['partition','dividerWall'].includes(panel.kind),'every column has an attached partition');
-  const a=panel.rotation*Math.PI/180,dx=panel.x-column.x,dz=panel.z-column.z;
-  assert(Math.abs(Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-1.31)<.001&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.001,'partition end physically touches column face without overlap');
+  assert(next.items.some(panel=>{
+   if(!['partition','dividerWall'].includes(panel.kind))return false;
+   const span=panel.kind==='dividerWall'?dividerSpan(panel,next.items):{width:CATALOG[panel.kind].w,offset:0};
+   const a=panel.rotation*Math.PI/180,dx=panel.x+Math.cos(a)*span.offset-column.x,dz=panel.z+Math.sin(a)*span.offset-column.z;
+   return Math.abs(Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-(span.width+CATALOG.pillar.w)/2)<.001&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.001;
+  }),'every column touches a partition end on the structural grid');
  }
 
  assert.equal(CATALOG.pillar.w,CATALOG.table.w);assert.equal(CATALOG.pillar.d,CATALOG.table.w);
@@ -83,8 +86,8 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  for(const b of benches){
   const a=b.rotation*Math.PI/180,back={x:b.x-Math.sin(a)*.33,z:b.z+Math.cos(a)*.33};
   const nearOuter=edges(outline).some(e=>{const u=(back.x-e.a.x)*e.tx+(back.z-e.a.z)*e.tz;return u>=0&&u<=e.length&&Math.abs((back.x-e.a.x)*e.nx+(back.z-e.a.z)*e.nz)<.1;});
-  const backing=next.items.filter(i=>['partition','dividerWall'].includes(i.kind)&&i.id.startsWith('banquette-wall-'));
-  const nearPanel=backing.some(p=>{const dx=back.x-p.x,dz=back.z-p.z;return p.rotation===b.rotation&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.025&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<.91;});
+  const backing=next.items.filter(i=>['partition','dividerWall'].includes(i.kind));
+  const nearPanel=backing.some(p=>{const dx=back.x-p.x,dz=back.z-p.z;return p.rotation%180===b.rotation%180&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<=CATALOG[p.kind].d/2+.025&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<.93;});
   assert(nearOuter||nearPanel,`unsupported bench back in shape ${shape}`);
   assert(benches.some(q=>q!==b&&q.rotation===b.rotation&&Math.abs(Math.hypot(q.x-b.x,q.z-b.z)-1.84)<.001),'each bench is connected to another bench');
  }

@@ -13,7 +13,7 @@ export function outlineError(p:Point[]):string|null{
  for(let i=0;i<es.length;i++)for(let j=i+1;j<es.length;j++){if(j===i+1||i===0&&j===es.length-1)continue;if(segmentsTouch(es[i].a,es[i].b,es[j].a,es[j].b))return '壁が交差しています';}
  if(!es.some(e=>e.length>=2.4))return '入口のために2.4m以上の壁を1本つくってください';return null;
 }
-export function entrance(p:Point[]){const wall=edges(p).filter(e=>e.length>=2.4).sort((a,b)=>(b.a.z+b.b.z)-(a.a.z+a.b.z))[0]||edges(p)[0];return{...wall,x:(wall.a.x+wall.b.x)/2,z:(wall.a.z+wall.b.z)/2};}
+export function entrance(p:Point[]){const wall=edges(p).filter(e=>e.length>=2.4).sort((a,b)=>(b.a.z+b.b.z)-(a.a.z+a.b.z))[0]||edges(p)[0];return{...wall,width:Math.min(3.2,wall.length-.4),x:(wall.a.x+wall.b.x)/2,z:(wall.a.z+wall.b.z)/2};}
 export function corners(r:Rect):Point[]{const a=r.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);return[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,z])=>({x:r.x+x*r.w/2*c-z*r.d/2*sn,z:r.z+x*r.w/2*sn+z*r.d/2*c}));}
 const orientations=new Map<number,{c:number;s:number}>();
 function orientation(rotation:number){let frame=orientations.get(rotation);if(!frame){const a=rotation*Math.PI/180;frame={c:Math.abs(Math.cos(a)),s:Math.abs(Math.sin(a))};if(orientations.size>128)orientations.clear();orientations.set(rotation,frame);}return frame;}

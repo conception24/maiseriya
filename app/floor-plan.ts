@@ -1,6 +1,6 @@
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar';
+export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside';mirror?:boolean};
 export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'gray'|'perforated';foodEnabled?:boolean;drinkbarStyle?:'wood'|'tile';invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
@@ -13,6 +13,7 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  chair:{name:'椅子',description:'籐編み / グレー2種類',w:.49,d:.5,seats:1},
  bench:{name:'長椅子',description:'つないで小テーブルと向かいの椅子を添えると「連続ベンチ席」になります',w:1.84,d:.66,seats:2},
  pillar:{name:'ビルの柱',description:'小テーブル幅・壁と同じ素材。鏡仕上げも選べます',w:.82,d:.82,seats:0},
+ dividerWall:{name:'手すり付き仕切り壁',description:'固定の腰壁＋木の手すり。長椅子やテーブルの背面に',w:1.8,d:.16,seats:0},
  partition:{name:'木の仕切り',description:'薄い板・丸い上角',w:1.8,d:.036,seats:0},
  venus:{name:'ヴィーナスの誕生',description:'ボッティチェリ / 壁に配置',w:2,d:.12,seats:0},
  primavera:{name:'春（プリマヴェーラ）',description:'ボッティチェリ / 壁に配置',w:2,d:.12,seats:0},
@@ -32,8 +33,8 @@ export function bounds(item:Item):Rect {const s=CATALOG[item.kind];return {x:ite
 export function dimensions(r:Rect){return r.rotation%180===0?{w:r.w,d:r.d}:{w:r.d,d:r.w};}
 export function snapArt(item:Item,polygon:Point[]):Item{if(!isArt(item.kind))return item;const half=CATALOG[item.kind].w/2+.12,valid=edges(polygon).filter(e=>e.length>=half*2);if(!valid.length)return item;const choices=valid.map(e=>{const t=Math.max(half,Math.min(e.length-half,(item.x-e.a.x)*e.tx+(item.z-e.a.z)*e.tz));const x=e.a.x+t*e.tx+e.nx*(item.side==='outside'?-.16:.16),z=e.a.z+t*e.tz+e.nz*(item.side==='outside'?-.16:.16);return{x,z,rotation:e.angle+(item.side==='outside'?180:0),d:Math.hypot(x-item.x,z-item.z)};}).sort((a,b)=>a.d-b.d);return{...item,x:choices[0].x,z:choices[0].z,rotation:choices[0].rotation};}
 export function placementError(item:Item,items:Item[],polygon=DEFAULT_OUTLINE):string|null{
- const r=bounds(item),entry=entrance(polygon);if(isArt(item.kind)){const fit=snapArt(item,polygon);if(Math.hypot(fit.x-item.x,fit.z-item.z)>.03||Math.abs(fit.rotation-item.rotation)>.01)return '絵画は壁の近くに配置してください';if(intersects(r,{x:entry.x,z:entry.z,w:1.8,d:.5,rotation:entry.angle}))return '入口の上には配置できません';if(items.some(o=>o.id!==item.id&&isArt(o.kind)&&intersects(r,bounds(o),.08)))return '絵画が重なっています';return null;}
- if(!rectInRoom(r,polygon,.088))return '壁の内側に配置してください';if(intersects(r,{x:entry.x+entry.nx*.45,z:entry.z+entry.nz*.45,w:1.4,d:1.1,rotation:entry.angle}))return '入口の前は空けておきましょう';if(item.kind==='robot'&&!canWalk(item.x,item.z,colliders(items),polygon,.3))return 'ロボットのまわりにもう少し余裕を空けてください';if(item.kind==='robot'&&items.filter(o=>o.id!==item.id&&o.kind==='robot').length>=5)return '配膳ロボットは5台まで配置できます';if(items.some(o=>o.id!==item.id&&!isArt(o.kind)&&intersects(r,bounds(o),-.0001)))return 'ほかの家具と重なっています';return null;
+ const r=bounds(item),entry=entrance(polygon);if(isArt(item.kind)){const fit=snapArt(item,polygon);if(Math.hypot(fit.x-item.x,fit.z-item.z)>.03||Math.abs(fit.rotation-item.rotation)>.01)return '絵画は壁の近くに配置してください';if(intersects(r,{x:entry.x,z:entry.z,w:entry.width+.2,d:.5,rotation:entry.angle}))return '入口の上には配置できません';if(items.some(o=>o.id!==item.id&&isArt(o.kind)&&intersects(r,bounds(o),.08)))return '絵画が重なっています';return null;}
+ if(!rectInRoom(r,polygon,.088))return '壁の内側に配置してください';if(intersects(r,{x:entry.x+entry.nx*.45,z:entry.z+entry.nz*.45,w:entry.width,d:1.1,rotation:entry.angle}))return '入口の前は空けておきましょう';if(item.kind==='robot'&&!canWalk(item.x,item.z,colliders(items),polygon,.3))return 'ロボットのまわりにもう少し余裕を空けてください';if(item.kind==='robot'&&items.filter(o=>o.id!==item.id&&o.kind==='robot').length>=5)return '配膳ロボットは5台まで配置できます';if(items.some(o=>o.id!==item.id&&!isArt(o.kind)&&intersects(r,bounds(o),-.0001)))return 'ほかの家具と重なっています';return null;
 }
 export function colliders(items:Item[]):Rect[]{const result:Rect[]=[];for(const i of items){if(isArt(i.kind)||i.kind==='robot')continue;const add=(x:number,z:number,w:number,d:number)=>{const a=i.rotation*Math.PI/180;result.push({x:i.x+x*Math.cos(a)-z*Math.sin(a),z:i.z+x*Math.sin(a)+z*Math.cos(a),w,d,rotation:i.rotation});};if(i.kind==='two'){add(0,0,.82,.78);add(0,-.72,.49,.5);add(0,.72,.49,.5);}else if(i.kind==='four'){add(0,0,1.53,.8);add(0,-.78,1.84,.66);add(0,.78,1.84,.66);}else{const s=CATALOG[i.kind];add(0,0,s.w,s.d);if(i.kind==='checkout')add(0,-.66,1.3,.6);}}return result;}
 export const canWalk=circleClear;

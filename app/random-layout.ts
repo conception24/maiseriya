@@ -297,6 +297,16 @@ export function randomArrangement(layout:Layout,random=Math.random,attempt=0):La
    if(next.filter(t=>t.kind==='two'||t.kind==='four').every(t=>customerSeatAccess(t,check))&&smallTableGroups(next).every(g=>smallGroupAccess(g,check))){items.push(candidate);screens++;break;}
   }
  }
+ // Upgrade structural seating boundaries to permanent plaster walls with handrails.
+ // Keep any thin board whose extra depth would obstruct furniture or a guest approach.
+ for(let n=0;n<items.length;n++){
+  const old=items[n];if(old.kind!=='partition'||!['column-wall-','island-','banquette-wall-'].some(prefix=>old.id.startsWith(prefix)))continue;
+  const fixed:Item={...old,kind:'dividerWall'};
+  if(placementError(fixed,items.filter((_,j)=>j!==n),outline))continue;
+  const next=items.map((i,j)=>j===n?fixed:i),check=planningNavigator(next,outline,spawn);
+  if(!next.filter(i=>i.kind==='two'||i.kind==='four').every(i=>customerSeatAccess(i,check))||!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
+  items[n]=fixed;
+ }
  // Choose robot starts after the final screens, from the entrance-connected component.
  const nav=planningNavigator(items,outline,spawn);
  for(let z=maxZ-2;z>minZ+1&&items.filter(i=>i.kind==='robot').length<3;z-=1)for(let x=minX+1;x<maxX-1;x+=1){if(items.filter(i=>i.kind==='robot').length>=3)break;if(nav.route(spawn,{x,z}).length)add('robot',x,z);}

@@ -37,7 +37,7 @@ export function assess(layout:Layout,weights:Preferences=defaultPreferences):Ass
  const blocked=tables.filter(i=>i.kind!=='table'&&!customerSeatAccess(i,nav)).length+smallTableGroups(layout.items).filter(g=>!smallGroupAccess(g,nav)).length+[...nav.kitchens,...(nav.restroom?[nav.restroom]:[])].filter(p=>!nav.reachable(p.point,.35)).length+layout.items.filter(i=>['serviceTable','drinkbar','checkout'].includes(i.kind)&&!nav.reachable({x:i.x-Math.sin(i.rotation*Math.PI/180)*.85,z:i.z+Math.cos(i.rotation*Math.PI/180)*.85},.3)).length;
  const density=Math.min(1,diningCost(layout.items)/Math.max(1,area(layout.outline)/10.5));
  const order=tables.filter(i=>tables.some(j=>j!==i&&i.rotation%180===j.rotation%180&&(Math.abs(i.x-j.x)<.12||Math.abs(i.z-j.z)<.12))).length/Math.max(1,tables.length);
- const wall=tables.filter(i=>walls.some(e=>{const t=(i.x-e.a.x)*e.tx+(i.z-e.a.z)*e.tz;return t>=0&&t<=e.length&&Math.abs((i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz)<CATALOG[i.kind].w/2+.35;})||layout.items.some(p=>p.kind==='partition'&&Math.hypot(i.x-p.x,i.z-p.z)<2)).length/Math.max(1,tables.length);
+ const wall=tables.filter(i=>walls.some(e=>{const t=(i.x-e.a.x)*e.tx+(i.z-e.a.z)*e.tz;return t>=0&&t<=e.length&&Math.abs((i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz)<CATALOG[i.kind].w/2+.35;})||layout.items.some(p=>['partition','dividerWall'].includes(p.kind)&&Math.hypot(i.x-p.x,i.z-p.z)<2)).length/Math.max(1,tables.length);
  let samples=0,unused=0,emptyRadius=0;const entry=entrance(layout.outline);const xs=layout.outline.map(p=>p.x),zs=layout.outline.map(p=>p.z);
  for(let x=Math.min(...xs)+1;x<Math.max(...xs);x+=.5)for(let z=Math.min(...zs)+1;z<Math.max(...zs);z+=.5){
   if(!rectInRoom({x,z,w:1,d:1,rotation:0},layout.outline,.1))continue;samples++;
@@ -45,7 +45,7 @@ export function assess(layout:Layout,weights:Preferences=defaultPreferences):Ass
   if(distance>1.4)unused++;if(Math.hypot(x-entry.x,z-entry.z)>3.5)emptyRadius=Math.max(emptyRadius,distance);
  }
  const banquette=layout.items.some(i=>i.kind==='bench')&&smallTableGroups(layout.items).some(g=>g.length===3||g.length===4)?1:0;
- const dividers=Math.min(1,layout.items.filter(i=>i.kind==='partition').length/Math.max(6,area(layout.outline)/15));
+ const dividers=Math.min(1,layout.items.filter(i=>['partition','dividerWall'].includes(i.kind)).length/Math.max(6,area(layout.outline)/15));
  const coverage=1-unused/Math.max(1,samples),score=preferenceScore({density,order,coverage,wall,dividers,banquette,emptyRadius,blocked,tables:tables.length,seats:layout.items.reduce((n,i)=>n+CATALOG[i.kind].seats,0)},weights);
  return{tables:tables.length,seats:layout.items.reduce((n,i)=>n+CATALOG[i.kind].seats,0),blocked,density,order,coverage,wall,dividers,banquette,emptyRadius,score};
 }

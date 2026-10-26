@@ -62,3 +62,16 @@ assert.equal(loads,2);pool.dispose();await new Promise(resolve=>setImmediate(res
 let rejectEarly;const early=new ReviewPrefetch(()=>({promise:new Promise((resolve,reject)=>{rejectEarly=reject;}),cancel:()=>rejectEarly(Error('closed'))}));
 const waiting=early.take(latest);early.dispose();await assert.rejects(waiting);
 console.log('PASS: single background worker, cached next question, latest-weight ranking, bounded refill, close cancellation and pending-answer cancellation.');
+
+// Shape selection must be lightweight and empty; furniture generation is a separate action.
+const {readFile}=await import('node:fs/promises'),{runInNewContext}=await import('node:vm'),ts=await import('typescript');
+const workerSource=(await readFile(new URL('../app/layout-worker.ts',import.meta.url),'utf8')).replace(/^import.*$/gm,'');
+const workerCode=ts.transpileModule(workerSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+const shape=[{x:-7,z:-8},{x:7,z:-8},{x:7,z:8},{x:-7,z:8}],messages=[];let proposalCalls=0;
+const workerSelf={postMessage:value=>messages.push(value)};
+runInNewContext(workerCode,{self:workerSelf,randomRoom:()=>shape,proposals:layout=>{proposalCalls++;return[{layout}];}});
+const before=JSON.stringify(base);workerSelf.onmessage({data:{layout:base,room:true}});
+assert.equal(proposalCalls,0,'shape generation must not run the furniture search');assert.equal(messages[0].layout.items.length,0);assert.equal(JSON.stringify(messages[0].layout.outline),JSON.stringify(shape));assert.equal(JSON.stringify(base),before);
+workerSelf.onmessage({data:{layout:messages[0].layout,room:false}});assert.equal(proposalCalls,1);assert.equal(JSON.stringify(messages[1].layout.outline),JSON.stringify(shape));
+assert(results.some(p=>p.layout.items.some(i=>i.kind==='dividerWall')),'random furnishing includes permanent handrail walls');
+console.log('PASS: shape-only generation skips furnishing, leaves an empty room without mutating the source; later furnishing preserves the chosen outline and supports fixed handrail walls.');

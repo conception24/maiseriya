@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {banquetteRun,smallTableGroups,smallGroupAccess,checkoutStaffArea} from '../work/model-test/seating-rules.mjs';
-import {CATALOG,bounds,canWalk,colliders,initialLayout,parseDocument,spawnPoint,edges} from '../work/model-test/floor-plan.mjs';
+import {CATALOG,bounds,canWalk,colliders,initialLayout,parseDocument,spawnPoint,edges,entrance} from '../work/model-test/floor-plan.mjs';
 import {createNavigator} from '../work/model-test/robot-navigation.mjs';
 import {proposals} from '../work/model-test/layout-review.mjs';
 import {intersects} from '../work/model-test/geometry.mjs';
@@ -66,7 +66,7 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  assert(axesX.length===1||axesZ.length===1||(axesX.length===2&&axesZ.length===2),'columns must form one line or an orthogonal L/rectangle');
  if(axesX.length===1||axesZ.length===1){const values=columns.map(i=>axesX.length===1?i.z:i.x).sort((a,b)=>a-b),pitch=values[1]-values[0];for(let n=2;n<values.length;n++)assert(Math.abs(values[n]-values[n-1]-pitch)<.001,'linear structural bays are evenly spaced');}
  for(const column of columns){
-  const panel=next.items.find(i=>i.id===column.id.replace('column-','column-wall-'));assert(panel&&panel.kind==='partition','every column has an attached partition');
+  const panel=next.items.find(i=>i.id===column.id.replace('column-','column-wall-'));assert(panel&&['partition','dividerWall'].includes(panel.kind),'every column has an attached partition');
   const a=panel.rotation*Math.PI/180,dx=panel.x-column.x,dz=panel.z-column.z;
   assert(Math.abs(Math.abs(dx*Math.cos(a)+dz*Math.sin(a))-1.31)<.001&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.001,'partition end physically touches column face without overlap');
  }
@@ -83,7 +83,7 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  for(const b of benches){
   const a=b.rotation*Math.PI/180,back={x:b.x-Math.sin(a)*.33,z:b.z+Math.cos(a)*.33};
   const nearOuter=edges(outline).some(e=>{const u=(back.x-e.a.x)*e.tx+(back.z-e.a.z)*e.tz;return u>=0&&u<=e.length&&Math.abs((back.x-e.a.x)*e.nx+(back.z-e.a.z)*e.nz)<.1;});
-  const backing=next.items.filter(i=>i.kind==='partition'&&i.id.startsWith('banquette-wall-'));
+  const backing=next.items.filter(i=>['partition','dividerWall'].includes(i.kind)&&i.id.startsWith('banquette-wall-'));
   const nearPanel=backing.some(p=>{const dx=back.x-p.x,dz=back.z-p.z;return p.rotation===b.rotation&&Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.025&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<.91;});
   assert(nearOuter||nearPanel,`unsupported bench back in shape ${shape}`);
   assert(benches.some(q=>q!==b&&q.rotation===b.rotation&&Math.abs(Math.hypot(q.x-b.x,q.z-b.z)-1.84)<.001),'each bench is connected to another bench');
@@ -98,3 +98,15 @@ const badPillar={id:'bad-pillar',kind:'pillar',x:0,z:0,rotation:0,mirror:'yes'};
 assert.throws(()=>parseDocument({version:2,outline,items:[badPillar]}));
 assert.throws(()=>parseDocument({version:2,outline,items:[{...badPillar,kind:'chair',mirror:true}]}));
 console.log('PASS: 3–4 aligned interior columns in all 34 plans, uniformly spaced lines or orthogonal L/rectangles, attached partitions at every column, mixed finishes and validated persistence.');
+
+// Fixed partitions are solid furniture, remain independent of thin movable boards,
+// and survive the same import/export and route validation as other items.
+assert(CATALOG.dividerWall.d>CATALOG.partition.d*3);
+const fixed={id:'fixed-wall',kind:'dividerWall',x:0,z:0,rotation:90};
+assert.equal(parseDocument({version:2,outline,items:[fixed]}).items[0].kind,'dividerWall');
+assert(!canWalk(0,0,colliders([fixed]),outline,.3));
+assert.equal(createNavigator([fixed],outline,{x:2,z:2}).canMove({x:0,z:0}),false);
+
+assert.equal(entrance(initialLayout().outline).width,3.2,'normal entrance is twice the former 1.6m width');
+const smallOutline=[{x:-1.5,z:-2},{x:1.5,z:-2},{x:1.5,z:2},{x:-1.5,z:2}];
+assert(entrance(smallOutline).width<=entrance(smallOutline).length-.39,'door frame fits smaller existing room edges');

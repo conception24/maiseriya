@@ -1,4 +1,5 @@
-import {bounds,type Item,type Point,type Rect} from './floor-plan';
+import {rectInRoom,intersects} from './geometry';
+import {bounds,isArt,type Item,type Point,type Rect} from './floor-plan';
 import type {createNavigator} from './robot-navigation';
 // The bench seam grid (1.84m) is independent from the 0.82m table grid.
 export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:number[]){
@@ -31,3 +32,16 @@ export function smallGroupAccess(group:Item[],nav:ReturnType<typeof createNaviga
 }
 export const diningCost=(items:Item[])=>items.reduce((n,i)=>n+(['two','four'].includes(i.kind)?1:i.kind==='table'?.5:0),0);
 export function checkoutStaffArea(item:Item):Rect{const a=item.rotation*Math.PI/180;return{x:item.x+Math.sin(a)*.66,z:item.z-Math.cos(a)*.66,w:1.3,d:.6,rotation:item.rotation};}
+
+// Rear handrails serve a real walking strip, never a wall/window-facing back.
+export function benchRearHandrail(item:Item,items:Item[],outline:Point[]):boolean{
+ if(item.kind!=='bench')return false;
+ const a=item.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
+ const joined=items.some(q=>q.id!==item.id&&q.kind==='bench'&&q.rotation===item.rotation&&Math.abs(Math.abs((q.x-item.x)*c+(q.z-item.z)*sn)-1.84)<.025&&Math.abs(-(q.x-item.x)*sn+(q.z-item.z)*c)<.025);
+ if(!joined)return false;
+ const rear={x:item.x-sn*.78,z:item.z+c*.78,w:1.72,d:.8,rotation:item.rotation};
+ return rectInRoom(rear,outline,.1)&&!items.some(q=>q.id!==item.id&&!isArt(q.kind)&&q.kind!=='robot'&&intersects(rear,bounds(q)));
+}
+export function dividerHandrail(item:Item,outline:Point[]):boolean{
+ return rectInRoom({...bounds(item),d:1},outline,.1);
+}

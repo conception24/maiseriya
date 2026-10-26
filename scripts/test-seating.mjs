@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {banquetteRun,smallTableGroups,smallGroupAccess,checkoutStaffArea} from '../work/model-test/seating-rules.mjs';
+import {banquetteRun,benchRearHandrail,dividerHandrail,smallTableGroups,smallGroupAccess,checkoutStaffArea} from '../work/model-test/seating-rules.mjs';
 import {CATALOG,bounds,canWalk,colliders,initialLayout,parseDocument,spawnPoint,edges,entrance} from '../work/model-test/floor-plan.mjs';
 import {createNavigator} from '../work/model-test/robot-navigation.mjs';
 import {proposals} from '../work/model-test/layout-review.mjs';
@@ -110,3 +110,17 @@ assert.equal(createNavigator([fixed],outline,{x:2,z:2}).canMove({x:0,z:0}),false
 assert.equal(entrance(initialLayout().outline).width,3.2,'normal entrance is twice the former 1.6m width');
 const smallOutline=[{x:-1.5,z:-2},{x:1.5,z:-2},{x:1.5,z:2},{x:-1.5,z:2}];
 assert(entrance(smallOutline).width<=entrance(smallOutline).length-.39,'door frame fits smaller existing room edges');
+
+for(const rotation of[0,90,180,270]){
+ const run=banquetteRun('rail',0,0,rotation,[3]),bench=run.items.find(i=>i.kind==='bench');
+ assert(benchRearHandrail(bench,run.items,outline),'interior joined benches have a rear walking strip');
+ const a=rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
+ const nearWall=run.items.map(i=>({...i,x:i.x-sn*(rotation===90||rotation===270?6.6:7.6),z:i.z+c*(rotation===90||rotation===270?6.6:7.6)}));
+ assert(!benchRearHandrail(nearWall[0],nearWall,outline),'wall/window-facing bench has no rail');
+ const obstruction={id:'rear-wall',kind:'dividerWall',x:bench.x-sn*.45,z:bench.z+c*.45,rotation};
+ assert(!benchRearHandrail(bench,[...run.items,obstruction],outline),'rear partition blocks a walking strip');
+ assert(!benchRearHandrail(bench,[bench],outline),'an isolated bench has no continuous handrail');
+ const wall={id:'rail-wall',kind:'dividerWall',x:0,z:0,rotation};assert(dividerHandrail(wall,outline));
+ assert(!dividerHandrail({...wall,x:rotation===90||rotation===270?6.8:0,z:rotation===0||rotation===180?7.8:0},outline),'wall-adjacent fixed dividers have no rail');
+}
+console.log('PASS: handrails only on joined benches with a clear rear aisle, no rails against walls/windows or rear partitions, in all four orientations.');

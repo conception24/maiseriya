@@ -271,17 +271,19 @@ export function randomArrangement(layout:Layout,random=Math.random,attempt=0):La
  for(const e of edges(outline).filter(e=>e.i!==entry.i&&Math.abs(e.angle%90)<.01))for(let t=.75;t<e.length-.75;t+=.25){
   const x=e.a.x+t*e.tx+e.nx*.53,z=e.a.z+t*e.tz+e.nz*.53,rotation=(e.angle+360)%360;
   const distance=Math.min(...furniture.map(i=>Math.hypot(x-i.x,z-i.z)));
-  supplyCandidates.push({x,z,rotation,score:Math.abs(distance-1.6)});
+  supplyCandidates.push({x,z,rotation,score:Math.abs(distance-1.4)+Math.min(2,t,e.length-t)*.35});
  }
  const supplyNav=planningNavigator(items,outline,spawnPoint(outline,items));
  for(const {x,z,rotation} of supplyCandidates.sort((a,b)=>a.score-b.score)){
+  if(items.filter(i=>i.kind==='serviceTable').length>=2)break;
+  if(items.some(i=>i.kind==='serviceTable'&&Math.hypot(i.x-x,i.z-z)<4))continue;
   const i:Item={id:'supply',kind:'serviceTable',x,z,rotation},a=rotation*Math.PI/180;
   const front={x:x-Math.sin(a)*.85,z:z+Math.cos(a)*.85,w:1,d:1.05,rotation};
   if(Math.hypot(x-entry.x,z-entry.z)<3||reserved.some(r=>intersects(bounds(i),r))||guestAisles.some(r=>intersects(bounds(i),r))||!rectInRoom(front,outline,.1)||items.some(o=>intersects(front,bounds(o)))||!supplyNav.reachable(front,.3))continue;
   if(placementError(i,items,outline))continue;
   const next=[...items,i],check=planningNavigator(next,outline,spawnPoint(outline,next));
   if(!next.filter(t=>['two','four'].includes(t.kind)).every(t=>customerSeatAccess(t,check))||!smallTableGroups(next).every(g=>smallGroupAccess(g,check)))continue;
-  add('serviceTable',x,z,rotation);guestAisles.push(front);break;
+  if(add('serviceTable',x,z,rotation))guestAisles.push(front);
  }
  const spawn=spawnPoint(outline,items);
  // Recheck both bench/chair approaches from the entrance, not just a point near the table.

@@ -1,3 +1,4 @@
+import {benchRearHandrail,dividerHandrail} from './seating-rules';
 import * as T from 'three';
 import {rackSide} from './table-arrangement';
 import {createTableMeal} from './table-meals';
@@ -68,7 +69,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  box(e.length,.1,.2,0,3.23,0,wood,g);
  }
  const lamps:T.PointLight[]=[];
- for(let x=-12;x<=12;x+=3.8)for(let z=-13;z<=12;z+=4){if(!canWalk(x,z,[],outline,.6))continue;cyl(.14,.14,.018,x,3.278,z,mat('#e5e0d3'));cyl(.105,.105,.012,x,3.265,z,new T.MeshStandardMaterial({color:'#fff7dc',emissive:'#fff0ce',emissiveIntensity:2}));const l=new T.PointLight('#ffeaca',9,7,2);l.position.set(x,3.1,z);scene.add(l);lamps.push(l);}
+ for(let x=-12;x<=12;x+=3.8)for(let z=-13;z<=12;z+=4){if(!canWalk(x,z,[],outline,.6))continue;const rim=cyl(.14,.14,.018,x,3.278,z,mat('#e5e0d3')),lens=cyl(.105,.105,.012,x,3.265,z,new T.MeshStandardMaterial({color:'#fff7dc',emissive:'#fff0ce',emissiveIntensity:2}));rim.castShadow=lens.castShadow=false;rim.receiveShadow=lens.receiveShadow=false;const l=new T.PointLight('#ffeaca',9,7,2);l.position.set(x,3.1,z);scene.add(l);lamps.push(l);}
  const hemi=new T.HemisphereLight('#e9f2e8','#927455',2);scene.add(hemi);const sun=new T.DirectionalLight('#fff1cb',3.4);sun.position.set(7,6,3);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:.1,far:30});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;scene.add(sun);
  function tableBody(x:number,z:number,w:number,d:number,parent:T.Object3D){box(w,.039,d,x,.7565,z,darkwood,parent,.015);box(w-.018,.021,d-.018,x,.786,z,top,parent,.01);cyl(.028,.033,.64,x,.35,z,metal,parent);box(w*.65,.055,.46,x,.045,z,metal,parent,.02);}
  function table(x:number,z:number,w:number,d:number,parent:T.Object3D=scene){tableBody(x,z,w,d,parent);props(x,z,w,parent);const meal=createTableMeal(meals.length,w);meal.userData.served=true;meal.userData.width=w;meal.userData.tableId=activeTableId;mealByTable.set(activeTableId,meal);const side=rackSide(items.find(i=>i.id===activeTableId)!,items,outline);meal.position.set(x-side*.115,.8,z);meal.scale.set((w-.25)/w,1,.9);meal.visible=options.foodEnabled!==false;parent.add(meal);meals.push(meal);textures.push(...meal.userData.textures); }
@@ -150,9 +151,9 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   for(const x of[-length/2+.18,length/2-.18]){cyl(.012,.012,.13,x,y-.075,z,steel,g);box(.06,.018,.055,x,y-.135,z,steel,g);}
   rod(new T.Vector3(-length/2+.015,y,z),new T.Vector3(length/2-.015,y,z),.028,wood,g);
  }
- function dividerWall(g:T.Object3D){
+ function dividerWall(g:T.Object3D,railed:boolean){
   box(1.8,1.10,.12,0,.55,0,wall,g);box(1.8,.045,.16,0,1.10,0,wood,g);
-  handrail(g,1.8,0,1.25);
+  if(railed)handrail(g,1.8,0,1.25);
  }
  function partition(g:T.Object3D){const shape=new T.Shape();shape.moveTo(-.9,0);shape.lineTo(.9,0);shape.lineTo(.9,1.19);shape.quadraticCurveTo(.9,1.25,.84,1.25);shape.lineTo(-.84,1.25);shape.quadraticCurveTo(-.9,1.25,-.9,1.19);shape.closePath();const geo=new T.ExtrudeGeometry(shape,{depth:.032,bevelEnabled:true,bevelThickness:.002,bevelSize:.002,bevelSegments:2,steps:1,curveSegments:12});geo.translate(0,0,-.016);const panel=new T.Mesh(geo,wood);panel.castShadow=true;panel.receiveShadow=true;g.add(panel);}
  const leafMaterials=['#36592f','#456d36','#527d3b','#63874a'].map(color=>new T.MeshStandardMaterial({color,roughness:.62,side:T.DoubleSide}));
@@ -228,7 +229,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   const staffTerminal=box(.24,.17,.035,.25,1.18,-.31,black,g,.012);staffTerminal.rotation.x=-.18;box(.19,.115,.006,.25,1.19,-.333,mat('#315b60',.25),g,.004);
   const terminal=box(.18,.04,.23,.51,.94,.12,black,g,.015);terminal.rotation.x=.28;cyl(.045,.05,.02,.51,.92,-.19,ivory,g);
  }
- for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':bench(0,0,0,g,items.some(i=>i!==item&&i.kind==='bench'&&i.rotation===item.rotation&&Math.abs(Math.hypot(i.x-item.x,i.z-item.z)-1.84)<.02));break;case 'partition':partition(g);break;case 'dividerWall':dividerWall(g);break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
+ for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':bench(0,0,0,g,benchRearHandrail(item,items,outline));break;case 'partition':partition(g);break;case 'dividerWall':dividerWall(g,dividerHandrail(item,outline));break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
 
  // Clamp every table-top component away from room walls, including angled walls.
  scene.updateMatrixWorld(true);

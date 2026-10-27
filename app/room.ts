@@ -1,7 +1,7 @@
 import {benchRearHandrail,continuousBenches,dividerHandrail,dividerSpan} from './seating-rules';
 import * as T from 'three';
 import {rackSide,rackOwner} from './table-arrangement';
-import {recruitmentPosterSite} from './decor-placement';
+import {recruitmentPosterSite,wallPlanterSites} from './decor-placement';
 import {createTableMeal} from './table-meals';
 import { colliders, canWalk, DEFAULT_OUTLINE,edges,entrance,inside,spawnPoint,isArt,CATALOG,type Layout,type Point,type Item } from './floor-plan';
 import {ARTWORKS} from './artworks';
@@ -30,7 +30,13 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  // One polygon drives the floor, ceiling, solid walls, windows and entry.
  const tileTex=texture(c=>{
   c.fillStyle='#263b33';c.fillRect(0,0,512,512);
-  for(let n=0;n<180;n++){let y=rand()*512;c.beginPath();c.moveTo(0,y);for(let x=0;x<=512;x+=16){y+=(rand()-.5)*12;c.lineTo(x,y);}c.strokeStyle=n%4?'#cdd8ce55':'#eef0dc88';c.lineWidth=.35+rand()*1.7;c.stroke();}
+  // Periodic, branching veins: curved at several scales, continuous across tile edges.
+  for(let n=0;n<45;n++){const y=rand()*512,phase=rand()*Math.PI*2,phase2=rand()*Math.PI*2,amp=8+rand()*24;
+   const vein=(x:number)=>y+amp*Math.sin(x*Math.PI*2/512+phase)+5*Math.sin(x*Math.PI*6/512+phase2);
+   c.beginPath();c.moveTo(0,vein(0));for(let x=8;x<=512;x+=8)c.lineTo(x,vein(x));
+   c.strokeStyle=n%4?'#cdd8ce50':'#eef0dc80';c.lineWidth=.45+rand()*1.45;c.stroke();
+   for(let b=0;b<2;b++){const x=35+rand()*420,by=vein(x),length=20+rand()*55,dir=rand()<.5?-1:1;c.beginPath();c.moveTo(x,by);c.quadraticCurveTo(x+length*.45,by+dir*length*.13,x+length,by+dir*length*.35);c.strokeStyle='#d9e2d640';c.lineWidth=.35+rand()*.55;c.stroke();}
+  }
   c.strokeStyle='#a6aaa3';c.lineWidth=2.5;c.strokeRect(0,0,512,512);
  });tileTex.wrapS=tileTex.wrapT=T.RepeatWrapping;tileTex.repeat.set(1/.6,1/.6);
  const shape=new T.Shape(outline.map(p=>new T.Vector2(p.x,-p.z)));const floor=new T.Mesh(new T.ShapeGeometry(shape),mat('#ffffff',.28,tileTex));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
@@ -154,6 +160,8 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const cane=mat('#d7aa65',.36,woodTex),binding=mat('#29251e',.48),plastic=mat('#85837d',.48);
  const wickerTex=texture(c=>{c.fillStyle='#393124';c.fillRect(0,0,512,512);for(let x=0;x<512;x+=16){c.fillStyle='#c7a760';c.fillRect(x+1,0,13,512);c.fillStyle='#e2c27c';c.fillRect(x+3,0,3,512);for(let y=(x/16%2)*12;y<512;y+=24){c.fillStyle='#3a3024';c.fillRect(x+1,y,13,5);}}});
  const wicker=mat('#ffffff',.6,wickerTex);wicker.side=T.DoubleSide;
+ const diamondTex=texture(c=>{c.fillStyle='#b28d56';c.fillRect(0,0,512,512);c.lineJoin='round';for(let r=350;r>2;r-=10){c.beginPath();c.moveTo(256,256-r);c.lineTo(256+r,256);c.lineTo(256,256+r);c.lineTo(256-r,256);c.closePath();c.strokeStyle=r%20?'#6d4c30':'#e1c38c';c.lineWidth=5;c.stroke();}});
+ const diamondWicker=mat('#ffffff',.72,diamondTex);diamondWicker.side=T.DoubleSide;
  const stripeTex=texture(c=>{c.fillStyle='#abb17a';c.fillRect(0,0,512,512);for(let x=0;x<512;x+=16){c.fillStyle='#c5c893';c.fillRect(x,0,3,512);c.fillStyle='#909969';c.fillRect(x+6,0,2,512);c.fillStyle='#b6bb84';c.fillRect(x+10,0,4,512);}});
  const backFabric=mat('#ffffff',.78,stripeTex);
  const holes=texture(c=>{c.fillStyle='white';c.fillRect(0,0,512,512);c.fillStyle='black';for(let y=8;y<512;y+=14)for(let x=8+(Math.floor(y/14)%2)*7;x<512;x+=14){c.beginPath();c.arc(x,y,4.1,0,Math.PI*2);c.fill();}});holes.colorSpace=T.NoColorSpace;
@@ -184,7 +192,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   tube([new T.Vector3(-.19,-.06,0),new T.Vector3(-.226,.17,0),new T.Vector3(-.20,.37,0),new T.Vector3(0,.49,0),new T.Vector3(.20,.37,0),new T.Vector3(.226,.17,0),new T.Vector3(.19,-.06,0)],.021,cane,back);
   const s=new T.Shape();s.moveTo(0,.458);s.bezierCurveTo(.04,.458,.20,.29,.20,.245);s.bezierCurveTo(.20,.20,.04,.025,0,.025);s.bezierCurveTo(-.04,.025,-.20,.20,-.20,.245);s.bezierCurveTo(-.20,.29,-.04,.458,0,.458);
   const geo=new T.ShapeGeometry(s,24),uv=geo.attributes.uv,pos=geo.attributes.position;for(let i=0;i<uv.count;i++)uv.setXY(i,(pos.getX(i)+.2)/.4,(pos.getY(i)-.025)/.433);
-  const panel=new T.Mesh(geo,wicker);panel.castShadow=true;back.add(panel);tube(s.getPoints(64).map(v=>new T.Vector3(v.x,v.y,0)),.004,binding,back);
+  const panel=new T.Mesh(geo,options.chairStyle==='wovenDiamond'?diamondWicker:wicker);panel.castShadow=true;back.add(panel);tube(s.getPoints(64).map(v=>new T.Vector3(v.x,v.y,0)),.004,binding,back);
   for(const a of[-1,1]){tube([new T.Vector3(a*.18,.015,0),new T.Vector3(a*.075,-.005,0),new T.Vector3(0,-.075,0)],.012,cane,back);rod(new T.Vector3(a*.19,.22,-.18),new T.Vector3(a*.19,.22,.18),.012,cane,g);for(const y of[.07,.09])cyl(.023,.023,.009,a*.208,y,0,binding,back);}
   for(const x of[-.044,-.022,0,.022,.044]){const band=new T.Mesh(new T.TorusGeometry(.022,.0025,6,16),binding);band.rotation.y=Math.PI/2;band.position.set(x,.49-Math.abs(x)*.12,0);back.add(band);}
  }
@@ -255,6 +263,18 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
     const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(vertices,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();const leaf=new T.Mesh(geometry,leafMaterials[(j+k)%4]);leaf.castShadow=true;leaf.receiveShadow=true;leafGroup.add(leaf);
     tube([new T.Vector3(0,0,.001),new T.Vector3(0,length*.5,.025),new T.Vector3(0,length,.001)],.0008,veinMaterial,leafGroup);
    }
+  }
+ }
+ // White ceramic wall planters: one shallow bowl and a lightweight leaf cluster.
+ const wallPot=mat('#f0eee5',.55),wallLeaves=['#315d35','#3d7140','#4f8249'].map(color=>mat(color,.72));
+ const leafGeometry=new T.SphereGeometry(1,8,6);
+ for(const site of wallPlanterSites(items,outline,[...kitchens,...(restroom?[restroom]:[])])){
+  const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.88,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);
+  const pot=cyl(.15,.065,.16,0,0,.16,wallPot,g);pot.scale.z=.65;pot.castShadow=false;
+  const lip=cyl(.157,.157,.018,0,.085,.16,wallPot,g);lip.scale.z=.65;lip.castShadow=false;
+  for(let color=0;color<3;color++){const foliage=new T.InstancedMesh(leafGeometry,wallLeaves[color],8),dummy=new T.Object3D();
+   for(let j=0;j<8;j++){const n=color*8+j,a=n*2.399,r=.025+.11*Math.sqrt((n+.5)/24);dummy.position.set(Math.cos(a)*r,.12+.035*(n%4)+.025*Math.sin(a),.16+Math.sin(a)*r*.58);dummy.rotation.set(.35*Math.sin(a),a,.5*Math.cos(a));dummy.scale.set(.045,.025,.032);dummy.updateMatrix();foliage.setMatrixAt(j,dummy.matrix);}
+   foliage.instanceMatrix.needsUpdate=true;g.add(foliage);
   }
  }
  let audioContext:AudioContext|null=null,gain:GainNode|null=null,osc:OscillatorNode|null=null,soundEnabled=false;const audioLast=new Map<string,Point>();

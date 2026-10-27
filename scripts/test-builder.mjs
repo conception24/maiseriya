@@ -65,3 +65,7 @@ const basin=savedDefault.items.find(i=>i.kind==='staffSink');assert(basin,'defau
 const defaultNav=createNavigator(savedDefault.items,savedDefault.outline,m.spawnPoint(savedDefault.outline,savedDefault.items));assert(Math.hypot(basin.x-defaultNav.kitchens[0].door.x,basin.z-defaultNav.kitchens[0].door.z)<2.5);assert(defaultNav.kitchens.every(k=>defaultNav.reachable(k.point,.35)));assert(!m.canWalk(basin.x,basin.z,m.colliders(savedDefault.items),savedDefault.outline,.2));
 console.log('PASS: default kitchen hand basin is placed near its doorway, blocks movement, and leaves the kitchen accessible.');
 
+assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'wovenDiamond'}).chairStyle,'wovenDiamond');
+assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'woven'}).chairStyle,'woven');
+console.log('PASS: both woven chair patterns survive layout export and import.');
+

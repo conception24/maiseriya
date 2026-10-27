@@ -1,6 +1,7 @@
 import {benchRearHandrail,continuousBenches,dividerHandrail,dividerSpan} from './seating-rules';
 import * as T from 'three';
 import {rackSide,rackOwner} from './table-arrangement';
+import {recruitmentPosterSite} from './decor-placement';
 import {createTableMeal} from './table-meals';
 import { colliders, canWalk, DEFAULT_OUTLINE,edges,entrance,inside,spawnPoint,isArt,CATALOG,type Layout,type Point,type Item } from './floor-plan';
 import {ARTWORKS} from './artworks';
@@ -76,17 +77,18 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  }
 
  else if(isKitchen&&kitchen){const half=kitchen.width/2,depth=kitchen.depth;const center=(kitchen.door.x-(e.a.x+e.b.x)/2)*e.tx+(kitchen.door.z-(e.a.z+e.b.z)/2)*e.tz;const left=center-half+e.length/2,right=e.length/2-center-half;for(const [w,cx] of [[left,-e.length/2+left/2],[right,e.length/2-right/2]])if(w>0){box(w,3.3,.18,cx,1.65,0,wall,g);box(w,.82,.1,cx,.41,.1,darkwood,g);}box(kitchen.width,1.05,.18,center,2.775,0,wall,g);for(const dx of[-half-.02,half+.02])box(.055,2.25,.2,center+dx,1.125,0,darkwood,g);box(kitchen.width+.06,.055,.2,center,2.25,0,darkwood,g);const dark=mat('#252a23');box(kitchen.width,2.25,.04,center,1.125,-depth,dark,g);box(.04,2.25,depth,center-half,1.125,-depth/2,dark,g);box(.04,2.25,depth,center+half,1.125,-depth/2,dark,g);box(kitchen.width,.025,depth,center,0,-depth/2,dark,g);if(isRestroom){
- const white=mat('#efeee7',.48),handle=mat('#bcc1be',.22),dw=kitchen.width-.06,dh=2.19,gw=.14,gh=1.12,gy=1.39;
- // A real opening in the white leaf, filled with opaque frosted glass.
- for(const side of[-1,1])box((dw-gw)/2,dh,.055,center+side*(dw+gw)/4,dh/2+.025,.025,white,g);
+ const doorWood=mat('#b8864f',.52,woodTex),centerWood=mat('#73563b',.53,woodTex),handle=mat('#a9b1ad',.22),dw=kitchen.width-.06,dh=2.19,gw=Math.min(.55,dw*.53),gh=.67,gy=1.55;
+ // Wood door with a large glazed upper window and a central darker panel.
+ for(const side of[-1,1])box((dw-gw)/2,dh,.055,center+side*(dw+gw)/4,dh/2+.025,.025,doorWood,g);
  const bottom=gy-gh/2,top=gy+gh/2;
- box(gw,bottom-.025,.055,center,(bottom+.025)/2,.025,white,g);
- box(gw,dh+.025-top,.055,center,(dh+.025+top)/2,.025,white,g);
- box(gw,gh,.025,center,gy,.025,mat('#c9d9d5',.94),g);
- const hx=center+dw*.36;
- for(const y of[.91,1.19])box(.025,.025,.085,hx,y,.09,handle,g);
- box(.025,.305,.025,hx,1.05,.135,handle,g);
-}const label=texture(c=>{c.fillStyle='#304839';c.fillRect(0,0,512,512);c.fillStyle='#eee8ce';c.textAlign='center';c.font='bold 75px sans-serif';c.fillText(isRestroom?'お手洗い / WC':'KITCHEN',256,285);});const sign=new T.Mesh(new T.PlaneGeometry(.85,.20),mat('#ffffff',.8,label));sign.position.set(center,2.45,.105);g.add(sign);}
+ box(gw,bottom-.025,.055,center,(bottom+.025)/2,.025,centerWood,g);
+ box(gw,dh+.025-top,.055,center,(dh+.025+top)/2,.025,doorWood,g);
+ box(gw,gh,.018,center,gy,.025,new T.MeshStandardMaterial({color:'#c4ddd1',roughness:.24,transparent:true,opacity:.38,depthWrite:false}),g);
+ for(const side of[-1,1]){box(.025,gh+.035,.025,center+side*gw/2,gy,.055,handle,g);box(gw+.02,.025,.025,center,gy+side*gh/2,.055,handle,g);}
+ box(dw-.03,.15,.018,center,.10,.065,handle,g);
+ const hx=center+dw*.37;box(.085,.37,.018,hx,1.0,.066,mat('#585f5b',.3),g);
+ for(const y of[.86,1.14])box(.035,.035,.075,hx,y,.10,handle,g);box(.035,.30,.03,hx,1.0,.145,handle,g);
+}const label=texture(c=>{c.fillStyle=isRestroom?'#f3f3e9':'#304839';c.fillRect(0,0,512,512);c.fillStyle=isRestroom?'#27675d':'#eee8ce';c.textAlign='center';c.font='bold 76px sans-serif';c.fillText(isRestroom?'↑  WC':'KITCHEN',256,285);});const sign=new T.Mesh(new T.PlaneGeometry(isRestroom?.65:.85,isRestroom?.17:.20),mat('#ffffff',.8,label));sign.position.set(center,isRestroom?2.04:2.45,.105);g.add(sign);}
  else if(windowWall){
   const count=Math.max(1,Math.ceil(e.length/2.5)),bay=e.length/count;
   for(let j=0;j<count;j++){
@@ -104,6 +106,11 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
 
  else{box(e.length,3.3,.18,0,1.65,0,wall,g);box(e.length,.82,.1,0,.41,.1,darkwood,g);for(const y of[.12,.8,.9])box(e.length,.045,.12,0,y,.14,wood,g);for(let x=-e.length/2+.4;x<e.length/2;x+=.8)box(.025,.62,.04,x,.46,.16,wood,g);}
  box(e.length,.1,.2,0,3.23,0,wood,g);
+ }
+ // A small recruitment notice on a solid wall near the self checkout.
+ const pick=recruitmentPosterSite(items,outline,[...kitchens,...(restroom?[restroom]:[])]);
+ if(pick){const poster=texture(c=>{c.fillStyle='#21825d';c.fillRect(0,0,512,512);c.fillStyle='#f5ebd5';c.fillRect(30,35,452,440);for(let y=50;y<460;y+=24)for(let x=36;x<476;x+=24){c.fillStyle=((x-36)/24+(y-50)/24)%2?'#bb3c36':'#f8e8db';c.fillRect(x,y,24,24);}c.fillStyle='#f6edda';c.beginPath();c.ellipse(256,230,195,145,0,0,Math.PI*2);c.fill();c.fillStyle='#a71f32';c.textAlign='center';c.font='bold italic 57px Georgia';c.fillText('Saizeriya',256,130);for(let n=0;n<4;n++){const x=156+n*66;c.fillStyle='#e5bc92';c.beginPath();c.arc(x,212,22,0,Math.PI*2);c.fill();c.fillStyle='#273b4c';c.fillRect(x-27,238,54,86);c.fillStyle='#f2f1e7';c.fillRect(x-5,240,10,36);}c.fillStyle='#b42d31';c.fillRect(30,365,452,45);c.fillStyle='#fff';c.font='bold 30px sans-serif';c.fillText('仲間を募集しています',256,397);c.fillStyle='#326b52';c.fillRect(30,410,452,65);c.fillStyle='#fff';c.font='24px sans-serif';c.fillText('スタッフ募集',256,450);});
+   const g=new T.Group();g.position.set(pick.e.a.x+pick.e.tx*pick.t,0,pick.e.a.z+pick.e.tz*pick.t);g.rotation.y=-pick.e.angle*Math.PI/180;scene.add(g);const panel=new T.Mesh(new T.PlaneGeometry(.58,.76),mat('#ffffff',.8,poster));panel.position.set(0,1.95,.103);g.add(panel);
  }
  const lamps:T.PointLight[]=[];
  for(let x=-12;x<=12;x+=3.8)for(let z=-13;z<=12;z+=4){if(!canWalk(x,z,[],outline,.6))continue;const rim=cyl(.14,.14,.018,x,3.278,z,mat('#e5e0d3')),lens=cyl(.105,.105,.012,x,3.265,z,new T.MeshStandardMaterial({color:'#fff7dc',emissive:'#fff0ce',emissiveIntensity:2}));rim.castShadow=lens.castShadow=false;rim.receiveShadow=lens.receiveShadow=false;const l=new T.PointLight('#ffeaca',9,7,2);l.position.set(x,3.1,z);scene.add(l);lamps.push(l);}
@@ -258,6 +265,15 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const sign=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshStandardMaterial({map:lettering,transparent:true,alphaTest:.1,roughness:.38,side:T.DoubleSide}));sign.position.set(0,2.05,-.04);g.add(sign);return;
 }if(!logo){const ivory=mat('#d8d5c9',.48);for(const side of[-1,1]){box(w+.14,.07,.018,0,2.05+side*(h/2+.035),-.052,ivory,g);box(.07,h,.018,side*(w/2+.035),2.05,-.052,ivory,g);box(w+.08,.01,.003,0,2.05+side*(h/2+.035),-.041,steel,g);box(.01,h+.06,.003,side*(w/2+.035),2.05,-.041,steel,g);}}const tex=new T.TextureLoader().load(art.src,loaded=>{if(logo&&item.logoStyle==='mono'){const canvas=document.createElement('canvas');canvas.width=loaded.image.width;canvas.height=loaded.image.height;const c=canvas.getContext('2d')!;c.drawImage(loaded.image,0,0);const data=c.getImageData(0,0,canvas.width,canvas.height);for(let n=0;n<data.data.length;n+=4){const v=.2126*data.data[n]+.7152*data.data[n+1]+.0722*data.data[n+2];data.data[n]=v*.62+55;data.data[n+1]=v*.62+58;data.data[n+2]=v*.62+51;}c.putImageData(data,0,0);const mono=new Image();mono.onload=()=>{loaded.image=mono;loaded.needsUpdate=true;};mono.src=canvas.toDataURL();}});tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=renderer.capabilities.getMaxAnisotropy();textures.push(tex);const picture=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshStandardMaterial({map:tex,roughness:.8,transparent:logo,alphaTest:logo?.1:0,side:logo?T.DoubleSide:T.FrontSide}));picture.position.set(0,2.05,logo?-.065:-.046);g.add(picture);}
  function servi(g:T.Group){const white=mat('#efeee7',.4),black=mat('#242827',.5);cyl(.225,.23,.16,0,.12,0,black,g);cyl(.215,.22,.17,0,.25,0,white,g);box(.18,.61,.1,0,.63,.155,white,g,.04);for(const y of[.37,.7,1.025]){cyl(y===.37?.184:.2,y===.37?.172:.2,.035,0,y,0,black,g);cyl(.2,.18,.028,0,y-.028,0,white,g);}cyl(.217,.217,.025,0,.19,0,black,g);box(.11,.09,.045,0,.95,.19,black,g,.012);const screen=box(.085,.055,.006,0,.955,.163,mat('#75b8af',.25),g,.008);screen.rotation.x=-.2;for(const x of[-.16,.16])cyl(.034,.034,.02,x,.073,0,black,g);}
+ function staffSink(g:T.Group){
+  const ceramic=mat('#e6e9e2',.3),inside=mat('#d4ded7',.34),tap=mat('#a6b3ac',.22),soap=mat('#67b7a0',.4);
+  box(.52,.65,.35,0,.33,0,ceramic,g,.025);box(.57,.14,.41,0,.72,0,ceramic,g,.045);
+  box(.43,.014,.27,0,.798,.025,inside,g,.025);cyl(.025,.025,.008,0,.809,.08,tap,g);
+  box(.57,.14,.07,0,.83,-.17,ceramic,g,.025);rod(new T.Vector3(.04,.86,-.15),new T.Vector3(.04,.86,-.02),.019,tap,g);
+  cyl(.036,.036,.12,-.17,.91,-.12,soap,g);cyl(.037,.037,.018,-.17,.977,-.12,ceramic,g);
+  box(.32,.18,.10,0,1.25,-.18,tap,g,.012);box(.27,.10,.005,0,1.25,-.123,ceramic,g);
+  const label=texture(c=>{c.fillStyle='#f6f6ef';c.fillRect(0,0,512,512);c.fillStyle='#202722';c.textAlign='center';c.font='bold 104px sans-serif';c.fillText('従業員専用',256,295);});const note=new T.Mesh(new T.PlaneGeometry(.27,.10),mat('#ffffff',.8,label));note.position.set(0,1.25,-.119);g.add(note);
+ }
  function serviceTable(g:T.Group){
   tableBody(0,0,.82,.78,g);
   // Three side-by-side menu cases along the back, visible with meals off.
@@ -329,7 +345,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const first=run[0],last=run[run.length-1],a=item.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),length=1.84+(last.x-first.x)*c+(last.z-first.z)*sn;
  const sofa=bench((length-1.84)/2,0,0,g,false,false,length);
  for(const member of run)if(benchRearHandrail(member,items,outline)){const rail=new T.Group();rail.position.x=(member.x-first.x)*c+(member.z-first.z)*sn-(length-1.84)/2;sofa.add(rail);if(member.screen)privacyScreen(rail,1.84,.30,1.17);else handrail(rail,1.84,.30,1.26);}
- break;}case 'partition':partition(g);break;case 'dividerWall':dividerWall(g,item,dividerHandrail(item,outline));break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
+ break;}case 'partition':partition(g);break;case 'dividerWall':dividerWall(g,item,dividerHandrail(item,outline));break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;case 'staffSink':staffSink(g);break;}}
 
  // Clamp every table-top component away from room walls, including angled walls.
  scene.updateMatrixWorld(true);

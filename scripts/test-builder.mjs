@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {pathToFileURL} from 'node:url';
 const require=createRequire(path.resolve('package.json')),ts=require('typescript');fs.mkdirSync('work/model-test',{recursive:true});
-for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','dining-planner','random-layout','table-arrangement','edit-operations','layout-review','review-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
+for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','dining-planner','random-layout','table-arrangement','decor-placement','edit-operations','layout-review','review-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
 const m=await import(pathToFileURL(path.resolve('work/model-test/floor-plan.mjs'))),g=await import(pathToFileURL(path.resolve('work/model-test/geometry.mjs'))),{createNavigator}=await import(pathToFileURL(path.resolve('work/model-test/robot-navigation.mjs')));
 const initial=m.initialLayout();assert.equal(m.parseDocument({version:2,...initial}).items.length,16);assert.equal(m.parseDocument({version:1,items:initial.items.filter(i=>!m.isArt(i.kind)&&i.kind!=='robot')}).chairStyle,'woven');
 assert.equal(m.parseDocument({version:1,items:[]}).foodEnabled,true);
@@ -60,4 +60,8 @@ for(const rotation of [0,90,180,270]){
  assert.equal(continuousBenches([third,benches[0],benches[1]])[0].length,3);
 }
 console.log('PASS: continuous bench runs in four orientations, independent opposite or separated seats.');
+
+const basin=savedDefault.items.find(i=>i.kind==='staffSink');assert(basin,'default plan includes staff basin');
+const defaultNav=createNavigator(savedDefault.items,savedDefault.outline,m.spawnPoint(savedDefault.outline,savedDefault.items));assert(Math.hypot(basin.x-defaultNav.kitchens[0].door.x,basin.z-defaultNav.kitchens[0].door.z)<2.5);assert(defaultNav.kitchens.every(k=>defaultNav.reachable(k.point,.35)));assert(!m.canWalk(basin.x,basin.z,m.colliders(savedDefault.items),savedDefault.outline,.2));
+console.log('PASS: default kitchen hand basin is placed near its doorway, blocks movement, and leaves the kitchen accessible.');
 

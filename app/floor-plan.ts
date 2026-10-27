@@ -1,11 +1,12 @@
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool';
+export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool' | 'staffSink';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside';mirror?:boolean;screen?:boolean;logoStyle?:'color'|'mono'|'letters'};
 export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'gray'|'perforated';foodEnabled?:boolean;drinkbarStyle?:'wood'|'tile';invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
 export type Rect = {x:number;z:number;w:number;d:number;rotation:number};
 export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:number;seats:number}>={
+ staffSink:{name:'従業員用手洗い',description:'厨房脇の小さな手洗い・石けんとペーパー付き',w:.58,d:.42,seats:0},
  stool:{name:'待合スツール',description:'丸い木製座面と曲げ脚・入口付近の待合用',w:.42,d:.42,seats:0},
  two:{name:'2人席セット',description:'テーブル＋切替式チェア2脚',w:.86,d:1.95,seats:2},
  four:{name:'4人席セット',description:'テーブル＋クッション席2台',w:1.84,d:2.22,seats:4},
@@ -59,4 +60,5 @@ export function snapPlacement(raw:Item,items:Item[],polygon:Point[]):Item{
  for(const e of edges(polygon)){const along=(raw.x-e.a.x)*e.tx+(raw.z-e.a.z)*e.tz;if(along<0||along>e.length)continue;const support=own.w/2*Math.abs(e.nx)+own.d/2*Math.abs(e.nz),distance=(raw.x-e.a.x)*e.nx+(raw.z-e.a.z)*e.nz,delta=support+.09-distance;if(Math.abs(delta)<.22)candidates.push({...raw,x:raw.x+e.nx*delta,z:raw.z+e.nz*delta});}
  const valid=candidates.filter(c=>!placementError(c,items,polygon));valid.sort((a,b)=>{const magnetic=(c:Item)=>c.x!==base.x||c.z!==base.z;return Number(magnetic(b))-Number(magnetic(a))||Math.hypot(a.x-raw.x,a.z-raw.z)-Math.hypot(b.x-raw.x,b.z-raw.z);});return valid[0]??base;
 }
+
 

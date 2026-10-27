@@ -52,6 +52,19 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  if(wc){const wall=edges(outline)[wc.edge],screen:Item={id:'wc-screen',kind:'partition',x:wc.door.x+wc.nx*2.65,z:wc.door.z+wc.nz*2.65,rotation:(Math.round(wall.angle/90)*90+360)%360};
   if(!placementError(screen,items,outline)&&!reserved.some(r=>intersects(bounds(screen),r))){items.push(screen);serial++;}
  }
+ // A compact staff-only hand basin on the wall beside the primary kitchen.
+ // Keep the kitchen portal and the entrance-connected path open.
+ const k=initialDoors.kitchens[0];
+ if(k){const wall=edges(outline)[k.edge];if(Math.abs(wall.angle%90)<.01){
+  sink:for(const offset of[k.width/2+.38,k.width/2+.7,k.width/2+1.05, k.width/2+1.4])for(const sign of[1,-1]){
+   const x=k.door.x+wall.tx*offset*sign+wall.nx*.32,z=k.door.z+wall.tz*offset*sign+wall.nz*.32;
+   const sink:Item={id:'staff-sink',kind:'staffSink',x,z,rotation:(wall.angle+360)%360};
+   if(placementError(sink,items,outline))continue;
+   const nav=planningNavigator([...items,sink],outline,spawnPoint(outline,[...items,sink]));
+   if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(p=>nav.reachable(p.point,.35)))continue;
+   items.push(sink);break sink;
+  }
+ }}
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
  const dining=planDining(outline,items,reserved,random);

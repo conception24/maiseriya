@@ -55,6 +55,11 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
   items.push(...zone.items);aisles.push(...zone.aisles);occupied.push(...zone.items.map(bounds));zone.items.forEach(i=>ids.add(i.id));return true;
  }
  const clearance=(p:Point)=>Math.min(...wallEdges.map(e=>segmentDistance(p,e.a,e.b)));
+ const windowWalls=wallEdges.filter(e=>Math.abs(e.angle%90)<.01&&(e.nx<-.8||e.nz>.8)&&e.length>3&&e.i!==entry.i&&![...portals.kitchens,...(portals.restroom?[portals.restroom]:[])].some(p=>p.edge===e.i));
+ // Favor architectural cores which leave room for a full window-side row.
+ const windowOptions:Rect[]=[];
+ for(const e of windowWalls)for(let t=2.05;t<=e.length-2.05;t+=1){const r={x:e.a.x+e.tx*t+e.nx*1.65,z:e.a.z+e.tz*t+e.nz*1.65,w:3.9,d:3.05,rotation:e.angle};if(rectInRoom(r,outline,.08)&&![...occupied,...hard].some(b=>intersects(r,b)))windowOptions.push(r);}
+ const keepsWindow=(zone:Zone)=>windowOptions.some(r=>![...zone.items.map(bounds),...zone.aisles].some(b=>intersects(r,b)));
  function spine(x:number,z:number,rotation:number,count:number,sides:number[],tableCount:number):Zone{
   const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0},half=(count-1)*structuralPitch/2;
   for(let n=0;n<count;n++){const column=f.item('pillar',-half+n*structuralPitch,0);column.mirror=n===0;zone.items.push(column);}
@@ -82,7 +87,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    for(const sides of[[1,-1],[preferSide],[-preferSide]]){
     const zone=spine(x,z,rotation,count,sides,random()<.5?3:4);if(!fits(zone))continue;
     const centreDistance=Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2);
-    zone.score=(count-1)*sides.length*6-centreDistance*.6+(rotation===preferRotation?.4:0)+random()*.8;
+    zone.score=(count-1)*sides.length*6-centreDistance*.6+(rotation===preferRotation?.4:0)+(keepsWindow(zone)?24:0)+random()*.8;
     cores.push(zone);
    }
   }
@@ -101,7 +106,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    const q=f.rect(u,v,1,1),run=banquetteRun('banquette-elbow-'+serial++,q.x,q.z,turn(rotation+r),[4],random()<.5);zone.items.push(...run.items);
   }
   zone.aisles.push(f.rect(0,-p-3,structuralPitch+.82,mainWidth),{...f.rect(-p-3,0,structuralPitch+.82,mainWidth),rotation:turn(rotation+90)},f.rect(0,-p+3,3.68,guestWidth));
-  if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+random();cores.push(zone);}
+  if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+(keepsWindow(zone)?24:0)+random();cores.push(zone);}
  }
  cores.sort((a,b)=>b.score-a.score);
  let corePlaced=false;
@@ -131,8 +136,29 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
 
 
  const usableWalls=wallEdges.filter(e=>Math.abs(e.angle%90)<.01&&e.length>2.5);
+ // Match the walls that are actually rendered as windows, excluding service doors.
+ // Reserve complete, wall-backed bench rows before optional central bays and booth rows.
+ for(const e of windowWalls.sort((a,b)=>b.length-a.length)){
+  const candidates:Zone[]=[];
+  for(const count of[4,3]){const length=3.68;if(e.length<length+.2)continue;
+   for(let t=length/2+.1;t<=e.length-length/2-.09;t+=.5){
+    const run=banquetteRun('banquette-window-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),[count],count===4&&random()<.5);
+    const zone={items:run.items,aisles:run.aisles,score:count*.2-Math.min(t,e.length-t)*.015+random()*.05};if(fits(zone))candidates.push(zone);
+   }
+  }
+  candidates.sort((a,b)=>b.score-a.score);for(const zone of candidates)commit(zone);
+ }
  function placeSupplies(limit:number){
  const supplies:Zone[]=[];
+ // The back edge of a service table meets a column, with its accessible face
+ // pointing away from that column. Prefer these over ordinary wall positions.
+ for(const pillar of items.filter(i=>i.kind==='pillar'))for(const rotation of[0,90,180,270]){
+  const a=rotation*Math.PI/180,nx=-Math.sin(a),nz=Math.cos(a),x=pillar.x+nx*.805,z=pillar.z+nz*.805,f=local(x,z,rotation);
+  const i=f.item('serviceTable',0,0),front=f.rect(0,.95,1,1.1);
+  if(Math.hypot(x-entry.x,z-entry.z)<3)continue;
+  const zone={items:[i],aisles:[front],score:10+random()*.1};if(fits(zone))supplies.push(zone);
+ }
+
  for(const e of usableWalls)for(let t=.55;t<e.length-.55;t+=.25){
   const x=e.a.x+e.tx*t+e.nx*.51,z=e.a.z+e.tz*t+e.nz*.51,rotation=turn(e.angle),f=local(x,z,rotation);
   const i=f.item('serviceTable',0,0),front=f.rect(0,.95,1,1.1);
@@ -142,7 +168,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  }
  for(const zone of supplies.sort((a,b)=>b.score-a.score)){
   if(items.filter(i=>i.kind==='serviceTable').length>=limit)break;
-  if(items.some(i=>i.kind==='serviceTable'&&Math.hypot(i.x-zone.items[0].x,i.z-zone.items[0].z)<4))continue;
+  if(items.some(i=>i.kind==='serviceTable'&&Math.hypot(i.x-zone.items[0].x,i.z-zone.items[0].z)<6))continue;
   commit(zone);
  }
  }
@@ -157,7 +183,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const bankSites:{x:number;z:number;rotation:number}[]=[];
  for(let z=minZ+2;z<maxZ-2;z+=.6)for(let x=minX+2;x<maxX-2;x+=.6)
   for(const rotation of[coreAxis,90-coreAxis])bankSites.push({x,z,rotation});
- for(let pass=0;pass<Math.max(1,Math.floor(area(outline)/110));pass++){
+ for(let pass=0;pass<Math.max(1,Math.ceil(area(outline)/110));pass++){
   const banks:Zone[]=[];
   for(const {x,z,rotation} of bankSites)for(const sides of[[1,-1],[1],[-1]]){
    const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0};
@@ -210,7 +236,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  }
  wallCandidates.sort((a,b)=>b.score-a.score);
  for(const zone of wallCandidates.filter(z=>z.items[0].kind==='two'))if(commit(zone))break;
- for(const zone of wallCandidates)if(zone.items.length>1||zone.items[0].kind==='four')commit(zone);
+ for(const zone of wallCandidates)commit(zone);
 
  // Separate wings can use wall-backed long seating too.
  for(const e of usableWalls.sort((a,b)=>b.length-a.length)){

@@ -69,10 +69,21 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const behindBar=(art:Item)=>items.some(b=>b.kind==='drinkbar'&&intersects(bounds(art),{...bounds(b),d:1.3,w:3.45}));
  const artworks:Kind[]=['venus','primavera','cherubs','adam','annunciation','athens'];
  const candidates:Item[]=[];
- for(const e of edges(outline))for(let t=1.7;t<e.length-1.5;t+=4.5){const art=snapArt({id:`random-${serial++}`,kind:artworks[Math.floor(random()*artworks.length)],x:e.a.x+t*e.tx,z:e.a.z+t*e.tz,rotation:0},outline);if(openings.some(k=>intersects(bounds(art),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle})))continue;if(!behindBar(art)&&!placementError(art,items,outline))candidates.push(art);}
+ for(const e of edges(outline))for(let t=1.7;t<e.length-1.5;t+=4.5){
+  // Artwork replaces the affected window bays with wall panels in 3D; keep
+  // the windows behind a continuous bench unobstructed.
+  const windowWall=(e.nx<-.8||e.nz>.8)&&e.length>3&&e.i!==entry.i&&!openings.some(k=>k.edge===e.i);
+  if(windowWall){const bay=e.length/Math.ceil(e.length/2.5),artWidth=Math.max(...artworks.map(kind=>CATALOG[kind].w));
+   const blocked=items.some(b=>{if(b.kind!=='bench'||Math.abs(((b.rotation-e.angle+360)%360)-180)>1||Math.abs((b.x-e.a.x)*e.nx+(b.z-e.a.z)*e.nz-.42)>.10)return false;
+    const bt=(b.x-e.a.x)*e.tx+(b.z-e.a.z)*e.tz;
+    for(let center=bay/2;center<e.length;center+=bay)if(Math.abs(t-center)<(bay+artWidth)/2+.1&&Math.abs(bt-center)<(bay+CATALOG.bench.w)/2)return true;
+    return false;});if(blocked)continue;
+  }
+  const art=snapArt({id:`random-${serial++}`,kind:artworks[Math.floor(random()*artworks.length)],x:e.a.x+t*e.tx,z:e.a.z+t*e.tz,rotation:0},outline);if(openings.some(k=>intersects(bounds(art),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle})))continue;if(!behindBar(art)&&!placementError(art,items,outline))candidates.push(art);}
  const limit=Math.min(8,Math.max(3,Math.round(outline.reduce((sum,p,n)=>sum+Math.hypot(p.x-outline[(n+1)%outline.length].x,p.z-outline[(n+1)%outline.length].z),0)/14)));
  while(candidates.length&&items.filter(i=>isArt(i.kind)).length<limit){const art=candidates.splice(Math.floor(random()*candidates.length),1)[0];if(!placementError(art,items,outline))items.push(art);}
  return {...layout,items};
 }
 
 export {customerSeatAccess} from './seating-rules';
+

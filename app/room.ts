@@ -1,4 +1,4 @@
-import {benchRearHandrail,dividerHandrail,dividerSpan} from './seating-rules';
+import {benchRearHandrail,continuousBenches,dividerHandrail,dividerSpan} from './seating-rules';
 import * as T from 'three';
 import {rackSide,rackOwner} from './table-arrangement';
 import {createTableMeal} from './table-meals';
@@ -181,7 +181,15 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   for(const a of[-1,1]){tube([new T.Vector3(a*.18,.015,0),new T.Vector3(a*.075,-.005,0),new T.Vector3(0,-.075,0)],.012,cane,back);rod(new T.Vector3(a*.19,.22,-.18),new T.Vector3(a*.19,.22,.18),.012,cane,g);for(const y of[.07,.09])cyl(.023,.023,.009,a*.208,y,0,binding,back);}
   for(const x of[-.044,-.022,0,.022,.044]){const band=new T.Mesh(new T.TorusGeometry(.022,.0025,6,16),binding);band.rotation.y=Math.PI/2;band.position.set(x,.49-Math.abs(x)*.12,0);back.add(band);}
  }
- function bench(x:number,z:number,rot:number,parent:T.Object3D=scene,railed=false,screen=false){const g=new T.Group();g.position.set(x,0,z);g.rotation.y=rot;g.userData.seat="bench";parent.add(g);box(1.72,.35,.58,0,.22,-.02,darkwood,g,.018);box(1.76,.015,.58,0,.452,-.025,piping,g,.005);box(1.82,1.1,.035,0,.59,.3125,wood,g,.009);box(1.75,.05,.56,0,.48,-.035,green,g,.016);box(1.72,.30,.045,0,.75,.2725,backFabric,g,.012);box(1.72,.19,.045,0,1.005,.2725,backFabric,g,.012);box(1.82,.03,.06,0,1.15,.3,wood,g,.008);if(railed){if(screen)privacyScreen(g,1.84,.30,1.17);else handrail(g,1.84,.30,1.26);}}
+ function bench(x:number,z:number,rot:number,parent:T.Object3D=scene,railed=false,screen=false,length=1.84){
+  const g=new T.Group();g.position.set(x,0,z);g.rotation.y=rot;g.userData.seat='bench';g.userData.seatHalfWidth=length/2-.22;parent.add(g);
+  box(length-.12,.35,.58,0,.22,-.02,darkwood,g,.018);box(length-.08,.015,.58,0,.452,-.025,piping,g,.005);
+  box(length-.02,1.1,.035,0,.59,.3125,wood,g,.009);box(length-.09,.05,.56,0,.48,-.035,green,g,.016);
+  box(length-.12,.30,.045,0,.75,.2725,backFabric,g,.012);box(length-.12,.19,.045,0,1.005,.2725,backFabric,g,.012);
+  box(length-.02,.03,.06,0,1.15,.3,wood,g,.008);
+  if(railed){if(screen)privacyScreen(g,length,.30,1.17);else handrail(g,length,.30,1.26);}return g;
+ }
+
  // The same item coordinates and rotations drive the 2D plan and the 3D furniture.
 
  // A single 36 mm board with rounded top corners, without decorative infill.
@@ -315,7 +323,13 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   const staffTerminal=box(.24,.17,.035,.25,1.18,-.31,black,g,.012);staffTerminal.rotation.x=-.18;box(.19,.115,.006,.25,1.19,-.333,mat('#315b60',.25),g,.004);
   const terminal=box(.18,.04,.23,.51,.94,.12,black,g,.015);terminal.rotation.x=.28;cyl(.045,.05,.02,.51,.92,-.19,ivory,g);
  }
- for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'stool':cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.40,.045,x*.15,.22,z*.15,wood,g,.01);leg.rotation.z=x*-.08;}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;case 'partition':partition(g);break;case 'dividerWall':dividerWall(g,item,dividerHandrail(item,outline));break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
+ const benchRuns=continuousBenches(items),benchRunById=new Map<string,Item[]>();
+ for(const run of benchRuns)if(run.length>1)for(const member of run)benchRunById.set(member.id,run);
+ for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'stool':cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.40,.045,x*.15,.22,z*.15,wood,g,.01);leg.rotation.z=x*-.08;}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':{const run=benchRunById.get(item.id);if(!run){bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;}if(run[0].id!==item.id)break;
+ const first=run[0],last=run[run.length-1],a=item.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),length=1.84+(last.x-first.x)*c+(last.z-first.z)*sn;
+ const sofa=bench((length-1.84)/2,0,0,g,false,false,length);
+ for(const member of run)if(benchRearHandrail(member,items,outline)){const rail=new T.Group();rail.position.x=(member.x-first.x)*c+(member.z-first.z)*sn-(length-1.84)/2;sofa.add(rail);if(member.screen)privacyScreen(rail,1.84,.30,1.17);else handrail(rail,1.84,.30,1.26);}
+ break;}case 'partition':partition(g);break;case 'dividerWall':dividerWall(g,item,dividerHandrail(item,outline));break;case 'pillar':pillar(g,item.mirror===true);break;case 'plant':plant(g);break;case 'checkout':checkout(g);break;case 'drinkbar':drinkbar(g);break;case 'serviceTable':serviceTable(g);break;}}
 
  // Clamp every table-top component away from room walls, including angled walls.
  scene.updateMatrixWorld(true);
@@ -326,7 +340,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const raycaster=new T.Raycaster();let hoverHint='';
  function seatAt(e:PointerEvent){const rect=renderer.domElement.getBoundingClientRect();raycaster.setFromCamera(new T.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),camera);const hits=raycaster.intersectObjects(scene.children,true).filter(h=>{if(h.distance>=5)return false;let o:T.Object3D|null=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;});for(const hit of hits){let o:T.Object3D|null=hit.object;while(o&&!o.userData.seat)o=o.parent;if(o)return {group:o,point:hit.point};if(hit.distance>.1)return null;}return null;}
  function stand(){if(!seated)return;seated=false;camera.position.set(standingPosition.x,1.62,standingPosition.z);keys.clear();options.onSeat?.({seated:false,hint:'椅子をクリックして座れます'});}
- function sit(e:PointerEvent){const target=seatAt(e);if(!target)return;if(!seated){standingPosition.x=camera.position.x;standingPosition.z=camera.position.z;}const p=target.group.worldToLocal(target.point.clone());p.set(target.group.userData.seat==='bench'?Math.max(-.7,Math.min(.7,p.x)):0,1.3,-.03);target.group.localToWorld(p);camera.position.copy(p);const dir=target.group.getWorldDirection(new T.Vector3());yaw=Math.atan2(dir.x,dir.z);pitch=-.08;seated=true;keys.clear();options.onSeat?.({seated:true,hint:'着席中 · ドラッグで見回せます'});}
+ function sit(e:PointerEvent){const target=seatAt(e);if(!target)return;if(!seated){standingPosition.x=camera.position.x;standingPosition.z=camera.position.z;}const p=target.group.worldToLocal(target.point.clone());p.set(target.group.userData.seat==='bench'?Math.max(-(target.group.userData.seatHalfWidth??.7),Math.min(target.group.userData.seatHalfWidth??.7,p.x)):0,1.3,-.03);target.group.localToWorld(p);camera.position.copy(p);const dir=target.group.getWorldDirection(new T.Vector3());yaw=Math.atan2(dir.x,dir.z);pitch=-.08;seated=true;keys.clear();options.onSeat?.({seated:true,hint:'着席中 · ドラッグで見回せます'});}
  // First-person walking: collision checks are shared with the plan model.
  const keydown=(e:KeyboardEvent)=>{if((e.target as HTMLElement)?.closest('button,input,textarea,select,[role=slider]'))return;const key=e.key.toLowerCase();if(key==='e'&&seated){stand();return;}if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key)){e.preventDefault();keys.add(key);}};
  const keyup=(e:KeyboardEvent)=>keys.delete(e.key.toLowerCase());const clear=()=>{keys.clear();if(gain&&audioContext)gain.gain.setTargetAtTime(0,audioContext.currentTime,.03);};

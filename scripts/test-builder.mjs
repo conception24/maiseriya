@@ -50,3 +50,14 @@ for(const rotation of [0,90,180,270]){
 const savedDefault=JSON.parse(fs.readFileSync('app/default-layout.json','utf8'));assert(savedDefault.items.some(i=>i.kind==='bench'));assert(savedDefault.items.some(i=>i.kind==='checkout'));assert.equal(savedDefault.items.filter(i=>i.kind==='robot').length,3);assert.equal(m.parseDocument({version:2,...savedDefault}).items.length,savedDefault.items.length);
 console.log('PASS: joined and spaced bench tables, one rack per joined group, new initial layout round-trip.');
 
+const {continuousBenches}=await import(pathToFileURL(path.resolve('work/model-test/seating-rules.mjs')));
+for(const rotation of [0,90,180,270]){
+ const run=banquetteRun('continuous',0,0,rotation,[4]),benches=run.items.filter(i=>i.kind==='bench');
+ assert.equal(continuousBenches(benches).length,1);assert.equal(continuousBenches(benches)[0].length,2);
+ assert.equal(continuousBenches([benches[0],{...benches[1],rotation:(rotation+180)%360}]).length,2);
+ const a=rotation*Math.PI/180;assert.equal(continuousBenches([benches[0],{...benches[1],x:benches[1].x+Math.cos(a)*.08,z:benches[1].z+Math.sin(a)*.08}]).length,2);
+ const third={...benches[1],id:'third',x:benches[1].x+1.84*Math.cos(a),z:benches[1].z+1.84*Math.sin(a)};
+ assert.equal(continuousBenches([third,benches[0],benches[1]])[0].length,3);
+}
+console.log('PASS: continuous bench runs in four orientations, independent opposite or separated seats.');
+

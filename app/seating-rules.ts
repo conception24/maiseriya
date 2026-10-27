@@ -19,6 +19,18 @@ export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:
  aisles.push(rect(0,-2.45,length+1.5,1.35));
  return{items,aisles,length,groups};
 }
+// Consecutive aligned modules describe one continuous physical sofa. Opposite
+// backs, perpendicular benches and visible gaps remain separate runs.
+export function continuousBenches(items:Item[]):Item[][]{
+ const benches=items.filter(i=>i.kind==='bench'),remaining=new Set(benches.map(i=>i.id)),runs:Item[][]=[];
+ for(const first of benches){if(!remaining.delete(first.id))continue;const run=[first],a=first.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  for(let n=0;n<run.length;n++)for(const q of benches){if(!remaining.has(q.id)||q.rotation!==first.rotation)continue;const dx=q.x-run[n].x,dz=q.z-run[n].z;
+   if(Math.abs(Math.abs(dx*c+dz*s)-1.84)<.025&&Math.abs(-dx*s+dz*c)<.025){remaining.delete(q.id);run.push(q);}
+  }
+  run.sort((x,y)=>(x.x*c+x.z*s)-(y.x*c+y.z*s));runs.push(run);
+ }
+ return runs;
+}
 export function smallTableGroups(items:Item[]):Item[][]{
  const remaining=new Set(items.filter(i=>i.kind==='table').map(i=>i.id)),tables=items.filter(i=>i.kind==='table'),groups:Item[][]=[];
  for(const first of tables){if(!remaining.delete(first.id))continue;const group=[first];

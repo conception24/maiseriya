@@ -1,6 +1,6 @@
 import {benchRearHandrail,dividerHandrail,dividerSpan} from './seating-rules';
 import * as T from 'three';
-import {rackSide} from './table-arrangement';
+import {rackSide,rackOwner} from './table-arrangement';
 import {createTableMeal} from './table-meals';
 import { colliders, canWalk, DEFAULT_OUTLINE,edges,entrance,inside,spawnPoint,isArt,CATALOG,type Layout,type Point,type Item } from './floor-plan';
 import {ARTWORKS} from './artworks';
@@ -132,7 +132,8 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  const organizer=mat('#c9bd93',.68),tray=mat('#827b64',.65),steel=new T.MeshStandardMaterial({color:'#a4a6a0',metalness:.72,roughness:.32});
  function props(x:number,z:number,w:number,p:T.Object3D){
   const book=new T.Group();book.position.set(x,.8,z+.035);book.rotation.y=-.06;book.visible=options.foodEnabled===false;flatMenus.push(book);p.add(book);box(.182,.006,.332,0,0,0,cream,book,.002);const cover=new T.Mesh(new T.PlaneGeometry(.182,.332),menuMaterial);cover.rotation.x=-Math.PI/2;cover.position.y=.0035;cover.receiveShadow=true;book.add(cover);
-  const rack=new T.Group();const item=items.find(i=>i.id===activeTableId)!;const side=item.kind==='serviceTable'?1:rackSide(item,items,outline);rack.position.set(x+side*(w/2-.057),.8,z);rack.rotation.y=-side*Math.PI/2;rack.scale.z=.6;p.add(rack);
+  const item=items.find(i=>i.id===activeTableId)!;if(item.kind!=='serviceTable'&&!rackOwner(item,items))return;
+  const rack=new T.Group();const side=item.kind==='serviceTable'?1:rackSide(item,items,outline);rack.position.set(x+side*(w/2-.057),.8,z);rack.rotation.y=-side*Math.PI/2;rack.scale.z=.6;p.add(rack);
   box(.32,.008,.19,0,.004,0,organizer,rack,.004);
   // Slim case walls and four individually recessed pull-out drawers.
   for(const xx of[-.065,.148])box(.007,.215,.145,xx,.113,0,organizer,rack,.003);

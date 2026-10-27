@@ -2,7 +2,7 @@ import {rectInRoom,intersects} from './geometry';
 import {CATALOG,bounds,isArt,type Item,type Point,type Rect} from './floor-plan';
 import type {createNavigator} from './robot-navigation';
 // The bench seam grid (1.84m) is independent from the 0.82m table grid.
-export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:number[]){
+export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:number[],spread=false){
  const pitch=.82,gap=1.15,used=groups.reduce((n,c)=>n+c*pitch,0)+(groups.length-1)*gap;
  const benches=Math.ceil(used/1.84),length=benches*1.84,items:Item[]=[],aisles:Rect[]=[];
  const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
@@ -11,7 +11,8 @@ export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:
  for(let n=0;n<benches;n++)items.push(local('bench',-length/2+.92+n*1.84,0));
  let cursor=-used/2;
  for(const [n,count] of groups.entries()){
-  for(let k=0;k<count;k++){const u=cursor+pitch*(k+.5);items.push(local('table',u,-.85),local('chair',u,-1.5,180));}
+  const separated=spread&&count===4,number=separated?3:count;
+  for(let k=0;k<number;k++){const u=separated?cursor+pitch/2+k*(count*pitch-pitch)/(number-1):cursor+pitch*(k+.5);items.push(local('table',u,-.85),local('chair',u,-1.5,180));}
   cursor+=count*pitch;
   if(n<groups.length-1){aisles.push(rect(cursor+gap/2,-1.3,gap,1.8));cursor+=gap;}
  }
@@ -21,7 +22,7 @@ export function banquetteRun(id:string,x:number,z:number,rotation:number,groups:
 export function smallTableGroups(items:Item[]):Item[][]{
  const remaining=new Set(items.filter(i=>i.kind==='table').map(i=>i.id)),tables=items.filter(i=>i.kind==='table'),groups:Item[][]=[];
  for(const first of tables){if(!remaining.delete(first.id))continue;const group=[first];
-  for(let n=0;n<group.length;n++){const t=group[n],a=t.rotation*Math.PI/180;for(const q of tables){if(!remaining.has(q.id)||q.rotation%180!==t.rotation%180)continue;const dx=q.x-t.x,dz=q.z-t.z;if(Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.16&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<.96){remaining.delete(q.id);group.push(q);}}}
+  for(let n=0;n<group.length;n++){const t=group[n],a=t.rotation*Math.PI/180;for(const q of tables){if(!remaining.has(q.id)||q.rotation%180!==t.rotation%180)continue;const dx=q.x-t.x,dz=q.z-t.z;if(Math.abs(-dx*Math.sin(a)+dz*Math.cos(a))<.16&&Math.abs(dx*Math.cos(a)+dz*Math.sin(a))<1.26){remaining.delete(q.id);group.push(q);}}}
   groups.push(group);
  }
  return groups;
@@ -70,3 +71,4 @@ export function dividerSpan(item:Item,items:Item[]){
  const left=extension(-1),right=extension(1);
  return{width:half*2+left+right,offset:(right-left)/2};
 }
+

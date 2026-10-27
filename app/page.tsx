@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Armchair,ArrowDown,ArrowLeft,ArrowRight,ArrowUp,Camera,Check,ChevronRight,Copy,Download,Footprints,Grid2X2,Hand,Home,Layers,Maximize,Minus,Moon,MousePointer2,Plus,Redo2,RotateCw,Sun,Trash2,Undo2,Upload,X} from 'lucide-react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
-import {CATALOG,spawnPoint,initialLayout,parseDocument,placementError,snap,snapArt,snapPlacement,isArt,area,edges,entrance,type Layout,type Item,type Kind} from './floor-plan';
+import {CATALOG,spawnPoint,parseDocument,placementError,snap,snapArt,snapPlacement,isArt,area,edges,entrance,type Layout,type Item,type Kind} from './floor-plan';
 import {createNavigator} from './robot-navigation';
 import {LayoutQuestion} from './layout-comparison';
 import {defaultPreferences,ISSUE_OPTIONS,assess,learn,type AnswerSelection,type Proposal,type Feedback} from './layout-review';
@@ -11,10 +11,12 @@ import LayoutWorker from './layout-worker?worker&inline';
 import {selectionBox,selectInBox,deleteSelection} from './edit-operations';
 import type {RoomAPI,RobotState} from './room';
 import {ARTWORKS} from './artworks';
+import {rackOwner} from './table-arrangement';
+import defaultLayout from './default-layout.json';
 import {RoomShapeEditor} from './room-shape-editor';
 const kinds=['stool','two','four','table','wideTable','chair','bench','partition','dividerWall','pillar','plant','venus','primavera','cherubs','adam','annunciation','athens','logo','robot','checkout','drinkbar','serviceTable'] as Kind[];
-function Furniture({kind}:{kind:Kind}) {
- const table=(wide=false)=><g><rect x={wide?-.765:-.41} y={-.39} width={wide?1.53:.82} height={.78} rx={.045} fill="#d5ad76" stroke="#8d673d" strokeWidth={.035}/><path d={wide?'M-.6,-.15 H.6 M-.6,.08 H.6':'M-.28,-.15 H.28 M-.28,.08 H.28'} stroke="#b68a56" strokeWidth={.018} opacity={.55}/><rect x={wide?.48:.17} y={-.28} width={.18} height={.33} rx={.01} fill="#e8eee0" stroke="#4a925e" strokeWidth={.018}/></g>;
+function Furniture({kind,showRack=true}:{kind:Kind;showRack?:boolean}) {
+ const table=(wide=false)=><g><rect x={wide?-.765:-.41} y={-.39} width={wide?1.53:.82} height={.78} rx={.045} fill="#d5ad76" stroke="#8d673d" strokeWidth={.035}/><path d={wide?'M-.6,-.15 H.6 M-.6,.08 H.6':'M-.28,-.15 H.28 M-.28,.08 H.28'} stroke="#b68a56" strokeWidth={.018} opacity={.55}/>{showRack&&<rect x={wide?.48:.17} y={-.28} width={.18} height={.33} rx={.01} fill="#e8eee0" stroke="#4a925e" strokeWidth={.018}/>}</g>;
  const chair=<g className="chair-glyph"><rect x={-.22} y={-.21} width={.44} height={.43} rx={.13} fill="#376347" stroke="#19472e" strokeWidth={.028}/><path d="M-.245,.01 Q-.28,.29 0,.28 Q.28,.29 .245,.01" fill="none" stroke="#b9945e" strokeWidth={.065}/></g>;
  const bench=<g><rect x={-.91} y={-.33} width={1.82} height={.66} rx={.035} fill="#9c774a"/><rect x={-.84} y={-.28} width={1.68} height={.43} rx={.05} fill="#356243" stroke="#214b31" strokeWidth={.025}/><rect x={-.84} y={.16} width={1.68} height={.12} rx={.025} fill="#abb17a"/></g>;
  if(isArt(kind))return <g><rect x={-CATALOG[kind].w/2} y={-.06} width={CATALOG[kind].w} height={.12} fill="#ac8744" stroke="#634c28" strokeWidth=".025"/><path d={`M${-CATALOG[kind].w/2+.06},.07 H${CATALOG[kind].w/2-.06}`} stroke="#f2dda1" strokeWidth=".03"/></g>;
@@ -42,7 +44,7 @@ function WalkView({layout,night,api,onPosition,onError,onRobot,onSeat}:{onSeat:(
  return <><div ref={host} className="walk-canvas"/>{loading&&<div className="walk-loading">店内へ移動しています…</div>}</>;
 }
 export default function HomePage(){
- const [history,setHistory]=useState<{past:Layout[];present:Layout;future:Layout[]}>({past:[],present:initialLayout(),future:[]});
+ const [history,setHistory]=useState<{past:Layout[];present:Layout;future:Layout[]}>({past:[],present:{...defaultLayout,items:defaultLayout.items.map(i=>({...i})),outline:defaultLayout.outline.map(p=>({...p}))} as Layout,future:[]});
  const [review,setReview]=useState<Proposal|null>(null),[preferences,setPreferences]=useState(defaultPreferences),[feedback,setFeedback]=useState<Feedback[]>([]);
  const reviewQueue=useRef<ReviewPrefetch|null>(null);
  const [prefetch,setPrefetch]=useState<PrefetchStatus>({ready:0,loading:false});
@@ -121,7 +123,7 @@ export default function HomePage(){
     <polygon points={polygon} fill="url(#tiles)" stroke="#5a6453" strokeWidth=".18"/><polygon points={polygon} fill="url(#grid)" pointerEvents="none"/>
     <g transform={`translate(${entry.x} ${entry.z}) rotate(${entry.angle})`} pointerEvents="none"><path d={`M${-entry.width/2},0 H${entry.width/2}`} stroke="#edf0e7" strokeWidth=".2"/><path d={`M${-entry.width/2+.1},.1 V.7 H${entry.width/2-.1} V.1`} fill="#8aa58d20" stroke="#7f9e80" strokeWidth=".025" strokeDasharray=".08 .06"/></g><text x={entry.x-entry.nx*.45} y={entry.z-entry.nz*.45} textAnchor="middle" fontSize=".22" fill="#58705b">入口 / START</text>{restroom&&<text x={restroom.door.x+restroom.nx*.65} y={restroom.door.z+restroom.nz*.65} fontSize=".22" textAnchor="middle" fill="#536467">WC</text>}{kitchens.map((k,n)=><g key={k.edge} pointerEvents="none"><circle cx={k.door.x} cy={k.door.z} r=".22" fill="#436a68"/><text x={k.door.x+k.nx*.65} y={k.door.z+k.nz*.65} textAnchor="middle" fontSize=".21" fill="#315956">厨房 {n+1}</text></g>)}
     <text x={cx} y={minZ-.4} textAnchor="middle" fontSize=".21" fill="#7e877a">{(maxX-minX).toFixed(1)} m</text>
-    {items.map(item=>{const i=drag?.id===item.id?drag:item,meta=CATALOG[i.kind],bad=drag?.id===i.id&&placementError(i,items,outline);return <g key={i.id} transform={`translate(${i.x} ${i.z}) rotate(${i.rotation})`} className={`placed-item ${selection.includes(i.id)?'selected':''}`} tabIndex={tool?-1:0} role="button" aria-label={`${meta.name}を選択`} onPointerDown={e=>itemDown(e,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(i.id);setTool(null);}}}><rect x={-meta.w/2-.06} y={-meta.d/2-.06} width={meta.w+.12} height={meta.d+.12} rx=".07" fill={selection.includes(i.id)?'#3b795825':'transparent'} stroke={bad?'#bf5a42':selection.includes(i.id)?'#2f7951':'transparent'} strokeWidth=".035" strokeDasharray={bad?'.07 .05':undefined}/><g filter="url(#furniture-shadow)" pointerEvents="none"><Furniture kind={i.kind}/></g>{selection.includes(i.id)&&<circle cx="0" cy={-meta.d/2-.14} r=".055" fill="#2f7951"/>}</g>})}
+    {items.map(item=>{const i=drag?.id===item.id?drag:item,meta=CATALOG[i.kind],bad=drag?.id===i.id&&placementError(i,items,outline);return <g key={i.id} transform={`translate(${i.x} ${i.z}) rotate(${i.rotation})`} className={`placed-item ${selection.includes(i.id)?'selected':''}`} tabIndex={tool?-1:0} role="button" aria-label={`${meta.name}を選択`} onPointerDown={e=>itemDown(e,i)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(i.id);setTool(null);}}}><rect x={-meta.w/2-.06} y={-meta.d/2-.06} width={meta.w+.12} height={meta.d+.12} rx=".07" fill={selection.includes(i.id)?'#3b795825':'transparent'} stroke={bad?'#bf5a42':selection.includes(i.id)?'#2f7951':'transparent'} strokeWidth=".035" strokeDasharray={bad?'.07 .05':undefined}/><g filter="url(#furniture-shadow)" pointerEvents="none"><Furniture kind={i.kind} showRack={rackOwner(i,items)}/></g>{selection.includes(i.id)&&<circle cx="0" cy={-meta.d/2-.14} r=".055" fill="#2f7951"/>}</g>})}
     {drag&&dragInfo.current?.copy&&<g transform={`translate(${drag.x} ${drag.z}) rotate(${drag.rotation})`} pointerEvents="none" opacity=".65"><Furniture kind={drag.kind}/><rect x={-CATALOG[drag.kind].w/2} y={-CATALOG[drag.kind].d/2} width={CATALOG[drag.kind].w} height={CATALOG[drag.kind].d} fill="none" stroke={placementError(drag,items,outline)?'#c54d38':'#347b51'} strokeWidth=".05"/></g>}
     {marquee&&(()=>{const r=selectionBox(marquee.start,marquee.end);return <rect x={r.x-r.w/2} y={r.z-r.d/2} width={r.w} height={r.d} fill="#3d91752b" stroke="#28634a" strokeWidth=".035" strokeDasharray=".12 .06" pointerEvents="none"/>;})()}
     {candidate&&<g transform={`translate(${candidate.x} ${candidate.z}) rotate(${candidate.rotation})`} pointerEvents="none" opacity=".65"><Furniture kind={candidate.kind}/><rect x={-CATALOG[candidate.kind].w/2-.05} y={-CATALOG[candidate.kind].d/2-.05} width={CATALOG[candidate.kind].w+.1} height={CATALOG[candidate.kind].d+.1} rx=".06" fill={ghostError?'#d9483525':'#2c86562a'} stroke={ghostError?'#c54d38':'#347b51'} strokeWidth=".045" strokeDasharray=".08 .04"/></g>}
@@ -140,5 +142,6 @@ export default function HomePage(){
   <Dialog open={clearOpen} onOpenChange={setClearOpen}><DialogContent className="clear-dialog"><DialogTitle>家具をすべて片付けますか？</DialogTitle><DialogDescription>空っぽの店内から作り直せます。「元に戻す」で直前の配置に戻せます。</DialogDescription><div className="dialog-actions"><button onClick={()=>setClearOpen(false)}>キャンセル</button><button className="confirm-clear" onClick={()=>{commit([]);setSelected(null);setTool(null);setClearOpen(false);}}>すべて片付ける</button></div></DialogContent></Dialog>
  </main>;
 }
+
 
 

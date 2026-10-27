@@ -36,3 +36,17 @@ const curveNav=createNavigator([],m.DEFAULT_OUTLINE,{x:-3,z:3});
 const curve=[{x:-3,z:3},...curveNav.route({x:-3,z:3},{x:3,z:-3})];let diagonals=0,previousHeading=null,maxBend=0;
 for(let n=1;n<curve.length;n++){const a=curve[n-1],b=curve[n],dx=b.x-a.x,dz=b.z-a.z;if(Math.hypot(dx,dz)<.000001)continue;if(Math.abs(dx)>.0001&&Math.abs(dz)>.0001)diagonals++;const heading=Math.atan2(dz,dx);if(previousHeading!==null)maxBend=Math.max(maxBend,Math.abs(Math.atan2(Math.sin(heading-previousHeading),Math.cos(heading-previousHeading))));previousHeading=heading;assert(curveNav.canMove(b));}
 assert(diagonals>10);assert(maxBend<.15,`sharp bend ${maxBend}`);console.log('PASS: rounded right-angle route, intermediate diagonal positions, continuous path tangent.');
+
+// A four-table bench run can either seat a group or offer three evenly spaced tables.
+const {banquetteRun}=await import(pathToFileURL(path.resolve('work/model-test/seating-rules.mjs')));
+const {rackOwner}=await import(pathToFileURL(path.resolve('work/model-test/table-arrangement.mjs')));
+for(const rotation of [0,90,180,270]){
+ const joined=banquetteRun('joined',0,0,rotation,[4]);const spaced=banquetteRun('spaced',0,0,rotation,[4],true);
+ const jt=joined.items.filter(i=>i.kind==='table'),st=spaced.items.filter(i=>i.kind==='table');
+ assert.equal(jt.length,4);assert.equal(st.length,3);assert.equal(spaced.items.filter(i=>i.kind==='chair').length,3);assert.equal(spaced.length,joined.length);
+ assert(Math.abs(Math.hypot(st[1].x-st[0].x,st[1].z-st[0].z)-Math.hypot(st[2].x-st[1].x,st[2].z-st[1].z))<1e-8);
+ assert.equal(jt.filter(i=>rackOwner(i,joined.items)).length,1);assert.equal(st.filter(i=>rackOwner(i,spaced.items)).length,3);
+}
+const savedDefault=JSON.parse(fs.readFileSync('app/default-layout.json','utf8'));assert(savedDefault.items.some(i=>i.kind==='bench'));assert(savedDefault.items.some(i=>i.kind==='checkout'));assert.equal(savedDefault.items.filter(i=>i.kind==='robot').length,3);assert.equal(m.parseDocument({version:2,...savedDefault}).items.length,savedDefault.items.length);
+console.log('PASS: joined and spaced bench tables, one rack per joined group, new initial layout round-trip.');
+

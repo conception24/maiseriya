@@ -63,7 +63,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    for(const u of[from+1.33,from+3.17])zone.items.push(f.item('dividerWall',u,0));
    for(const side of sides){
     const u=from+structuralPitch/2,centre=f.rect(u,side*.412,1,1),r=turn(rotation+(side>0?180:0));
-    const run=banquetteRun('banquette-core-'+serial++,centre.x,centre.z,r,[tableCount]);
+    const run=banquetteRun('banquette-core-'+serial++,centre.x,centre.z,r,[tableCount],random()<.5);
     zone.items.push(...run.items);
    }
   }
@@ -98,7 +98,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
   columns.forEach((i,n)=>{i.mirror=n===0;});zone.items.push(...columns);
   for(const t of[1.33,3.17])zone.items.push(f.item('dividerWall',-p+t,-p),f.item('dividerWall',-p,-p+t,90));
   for(const [u,v,r] of[[0,-p-.412,0],[-p-.412,0,270],[0,-p+.412,180]]){
-   const q=f.rect(u,v,1,1),run=banquetteRun('banquette-elbow-'+serial++,q.x,q.z,turn(rotation+r),[random()<.5?3:4]);zone.items.push(...run.items);
+   const q=f.rect(u,v,1,1),run=banquetteRun('banquette-elbow-'+serial++,q.x,q.z,turn(rotation+r),[4],random()<.5);zone.items.push(...run.items);
   }
   zone.aisles.push(f.rect(0,-p-3,structuralPitch+.82,mainWidth),{...f.rect(-p-3,0,structuralPitch+.82,mainWidth),rotation:turn(rotation+90)},f.rect(0,-p+3,3.68,guestWidth));
   if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+random();cores.push(zone);}
@@ -163,7 +163,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0};
    for(const u of[-.92,.92])zone.items.push(f.item('dividerWall',u,0));
    for(const side of sides){
-    const q=f.rect(0,side*.412,1,1),run=banquetteRun('banquette-bay-'+serial++,q.x,q.z,turn(rotation+(side>0?180:0)),[4]);zone.items.push(...run.items);
+    const q=f.rect(0,side*.412,1,1),run=banquetteRun('banquette-bay-'+serial++,q.x,q.z,turn(rotation+(side>0?180:0)),[4],random()<.5);zone.items.push(...run.items);
     zone.aisles.push(f.rect(0,side*3,4.5,mainWidth));
    }
    if(sides.length===1)zone.aisles.push(f.rect(0,-sides[0]*.75,4.5,guestWidth));
@@ -217,7 +217,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
   for(const groups of[[3,4],[4],[3]]){
    const runLength=banquetteRun('measure',0,0,0,groups).length;
    for(const t of[runLength/2+.1,e.length-runLength/2-.1]){
-    const run=banquetteRun('banquette-wall-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),groups);
+    const run=banquetteRun('banquette-wall-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),groups,random()<.5);
     if(commit({items:run.items,aisles:run.aisles,score:0}))break;
    }
   }
@@ -225,4 +225,5 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  placeSupplies(2);
  return{items,aisles};
 }
+
 

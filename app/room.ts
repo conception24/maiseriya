@@ -30,13 +30,21 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  // One polygon drives the floor, ceiling, solid walls, windows and entry.
  const tileTex=texture(c=>{
   c.fillStyle='#263b33';c.fillRect(0,0,512,512);
-  // Periodic, branching veins: curved at several scales, continuous across tile edges.
-  for(let n=0;n<45;n++){const y=rand()*512,phase=rand()*Math.PI*2,phase2=rand()*Math.PI*2,amp=8+rand()*24;
-   const vein=(x:number)=>y+amp*Math.sin(x*Math.PI*2/512+phase)+5*Math.sin(x*Math.PI*6/512+phase2);
-   c.beginPath();c.moveTo(0,vein(0));for(let x=8;x<=512;x+=8)c.lineTo(x,vein(x));
-   c.strokeStyle=n%4?'#cdd8ce50':'#eef0dc80';c.lineWidth=.45+rand()*1.45;c.stroke();
-   for(let b=0;b<2;b++){const x=35+rand()*420,by=vein(x),length=20+rand()*55,dir=rand()<.5?-1:1;c.beginPath();c.moveTo(x,by);c.quadraticCurveTo(x+length*.45,by+dir*length*.13,x+length,by+dir*length*.35);c.strokeStyle='#d9e2d640';c.lineWidth=.35+rand()*.55;c.stroke();}
+  // One repeated tile texture: fine, irregular, intermittent mineral veins.
+  // Clip the stone pattern inside the grout so adjoining tiles never join.
+  c.save();c.beginPath();c.rect(7,7,498,498);c.clip();
+  for(let n=0;n<42;n++){
+   const base=25+rand()*462,phase=rand()*Math.PI*2,phase2=rand()*Math.PI*2,amp=7+rand()*20,slope=(rand()-.5)*.15;
+   const vein=(x:number)=>base+amp*Math.sin(x*.012+phase)+4*Math.sin(x*.04+phase2)+slope*(x-256);
+   let x=12+rand()*38,end=180+rand()*320;
+   while(x<end){const length=8+rand()*36,next=Math.min(end,x+length);c.beginPath();c.moveTo(x,vein(x));
+    for(let u=x+5;u<next;u+=5)c.lineTo(u,vein(u));c.lineTo(next,vein(next));
+    c.strokeStyle=n%4?'#c7d4c825':'#e2e9df35';c.lineWidth=.3+rand()*.8;c.stroke();
+    if(rand()<.18){const direction=rand()<.5?-1:1;c.beginPath();c.moveTo(x,vein(x));c.quadraticCurveTo(x+length*.45,vein(x)+direction*5,x+length*.8,vein(x)+direction*(7+rand()*8));c.strokeStyle='#d3dfd026';c.lineWidth=.35;c.stroke();}
+    x=next+3+rand()*22;
+   }
   }
+  c.restore();
   c.strokeStyle='#a6aaa3';c.lineWidth=2.5;c.strokeRect(0,0,512,512);
  });tileTex.wrapS=tileTex.wrapT=T.RepeatWrapping;tileTex.repeat.set(1/.6,1/.6);
  const shape=new T.Shape(outline.map(p=>new T.Vector2(p.x,-p.z)));const floor=new T.Mesh(new T.ShapeGeometry(shape),mat('#ffffff',.28,tileTex));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
@@ -265,15 +273,17 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
    }
   }
  }
- // White ceramic wall planters: one shallow bowl and a lightweight leaf cluster.
- const wallPot=mat('#f0eee5',.55),wallLeaves=['#315d35','#3d7140','#4f8249'].map(color=>mat(color,.72));
- const leafGeometry=new T.SphereGeometry(1,8,6);
+ // A few ceramic wall planters with slender stems and individual pointed leaves.
+ const wallPot=mat('#f0eee5',.55),wallStem=mat('#46673d',.85),wallLeaves=['#315d35','#3d7140','#547c46'].map(color=>{const m=mat(color,.82);m.side=T.DoubleSide;return m;});
+ const leafShape=new T.Shape();leafShape.moveTo(0,0);leafShape.quadraticCurveTo(.9,.20,.9,.48);leafShape.quadraticCurveTo(.65,.82,0,1);leafShape.quadraticCurveTo(-.65,.82,-.9,.48);leafShape.quadraticCurveTo(-.9,.20,0,0);
+ const leafGeometry=new T.ShapeGeometry(leafShape,8);
  for(const site of wallPlanterSites(items,outline,[...kitchens,...(restroom?[restroom]:[])])){
   const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.88,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);
   const pot=cyl(.15,.065,.16,0,0,.16,wallPot,g);pot.scale.z=.65;pot.castShadow=false;
   const lip=cyl(.157,.157,.018,0,.085,.16,wallPot,g);lip.scale.z=.65;lip.castShadow=false;
-  for(let color=0;color<3;color++){const foliage=new T.InstancedMesh(leafGeometry,wallLeaves[color],8),dummy=new T.Object3D();
-   for(let j=0;j<8;j++){const n=color*8+j,a=n*2.399,r=.025+.11*Math.sqrt((n+.5)/24);dummy.position.set(Math.cos(a)*r,.12+.035*(n%4)+.025*Math.sin(a),.16+Math.sin(a)*r*.58);dummy.rotation.set(.35*Math.sin(a),a,.5*Math.cos(a));dummy.scale.set(.045,.025,.032);dummy.updateMatrix();foliage.setMatrixAt(j,dummy.matrix);}
+  for(let k=0;k<5;k++){const a=(k-2)*.43;rod(new T.Vector3(0,.085,.16),new T.Vector3(Math.sin(a)*.11,.24-Math.abs(k-2)*.012,.16+Math.cos(a)*.015),.0025,wallStem,g);}
+  for(let color=0;color<3;color++){const foliage=new T.InstancedMesh(leafGeometry,wallLeaves[color],6),leaf=new T.Object3D();
+   for(let j=0;j<6;j++){const n=color*6+j,a=(n%6-2.5)*.45,layer=Math.floor(n/6);leaf.position.set(Math.sin(a)*(.045+layer*.017),.105+layer*.035,.16+.012*(n%3));leaf.rotation.set((n%3-1)*.32,(n%4-1.5)*.25,-a);leaf.scale.set(.024+(n%2)*.005,.075+(n%3)*.012,1);leaf.updateMatrix();foliage.setMatrixAt(j,leaf.matrix);}
    foliage.instanceMatrix.needsUpdate=true;g.add(foliage);
   }
  }

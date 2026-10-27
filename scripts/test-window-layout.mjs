@@ -23,8 +23,8 @@ for(let seed=1;seed<=20;seed++){
  }
  if(windows.length){windowCases++;if(found)withWindowBench++;}
  if(recruitmentPosterSite(layout.items,outline,doors))posters++;
- const wallPlants=wallPlanterSites(layout.items,outline,doors);assert(wallPlants.length<=6);if(wallPlants.length)planterRooms++;
- for(const p of wallPlants){assert(p.e.i!==entry.i);assert(!((p.e.nx<-.8||p.e.nz>.8)&&p.e.length>3&&!doors.some(d=>d.edge===p.e.i)),'planter mounted on a window');
+ const wallPlants=wallPlanterSites(layout.items,outline,doors);assert(wallPlants.length<=3);if(wallPlants.length)planterRooms++;
+ for(const [idx,p] of wallPlants.entries()){for(const q of wallPlants.slice(0,idx))assert(Math.hypot(p.e.a.x+p.e.tx*p.t-q.e.a.x-q.e.tx*q.t,p.e.a.z+p.e.tz*p.t-q.e.a.z-q.e.tz*q.t)>=3.8-1e-8);assert(p.e.i!==entry.i);assert(!((p.e.nx<-.8||p.e.nz>.8)&&p.e.length>3&&!doors.some(d=>d.edge===p.e.i)),'planter mounted on a window');
   const x=p.e.a.x+p.e.tx*p.t,z=p.e.a.z+p.e.tz*p.t;
   assert(!doors.some(d=>d.edge===p.e.i&&Math.hypot(x-d.door.x,z-d.door.z)<d.width/2+.42));
   for(const art of layout.items.filter(i=>isArt(i.kind)&&i.side!=='outside')){const normal=(art.x-p.e.a.x)*p.e.nx+(art.z-p.e.a.z)*p.e.nz,along=(art.x-p.e.a.x)*p.e.tx+(art.z-p.e.a.z)*p.e.tz;if(Math.abs(normal-.16)<.12)assert(Math.abs(along-p.t)>=CATALOG[art.kind].w/2+.35-1e-8);}

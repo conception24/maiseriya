@@ -33,7 +33,7 @@ export function wallPlanterSites(items:Item[],outline:Point[],doors:Door[]){
   }
  }
  candidates.sort((a,b)=>a.score-b.score);const result:typeof candidates=[];
- for(const c of candidates){const x=c.e.a.x+c.e.tx*c.t,z=c.e.a.z+c.e.tz*c.t;if(result.some(q=>Math.hypot(x-q.e.a.x-q.e.tx*q.t,z-q.e.a.z-q.e.tz*q.t)<2.3))continue;result.push(c);if(result.length>=6)break;}
+ for(const c of candidates){const x=c.e.a.x+c.e.tx*c.t,z=c.e.a.z+c.e.tz*c.t;if(result.some(q=>Math.hypot(x-q.e.a.x-q.e.tx*q.t,z-q.e.a.z-q.e.tz*q.t)<3.8))continue;result.push(c);if(result.length>=3)break;}
  return result;
 }
 

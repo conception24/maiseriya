@@ -33,6 +33,28 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   c.strokeStyle='#a6aaa3';c.lineWidth=2.5;c.strokeRect(0,0,512,512);
  });tileTex.wrapS=tileTex.wrapT=T.RepeatWrapping;tileTex.repeat.set(1/.6,1/.6);
  const shape=new T.Shape(outline.map(p=>new T.Vector2(p.x,-p.z)));const floor=new T.Mesh(new T.ShapeGeometry(shape),mat('#ffffff',.28,tileTex));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+ // Wooden flooring follows booth footprints and joined bench rows; the room shape clips its edges.
+ const woodAreas=items.filter(i=>i.kind==='four'||(i.kind==='bench'&&items.some(q=>q.id!==i.id&&q.kind==='bench'&&q.rotation===i.rotation&&(()=>{const a=i.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),dx=q.x-i.x,dz=q.z-i.z;return Math.abs(Math.abs(dx*c+dz*sn)-1.84)<.12&&Math.abs(-dx*sn+dz*c)<.12;})())));
+ if(woodAreas.length){
+  const minX=Math.min(...outline.map(p=>p.x)),maxX=Math.max(...outline.map(p=>p.x)),minZ=Math.min(...outline.map(p=>p.z)),maxZ=Math.max(...outline.map(p=>p.z));
+  const width=maxX-minX,depth=maxZ-minZ,size=2048;
+  const seatingFloor=texture(c=>{
+   c.save();c.scale(size/width,size/depth);c.translate(-minX,-minZ);
+   c.beginPath();
+   for(const i of woodAreas){c.save();c.translate(i.x,i.z);c.rotate(i.rotation*Math.PI/180);if(i.kind==='four')c.rect(-.94,-1.12,1.88,2.24);else c.rect(-.92,-1.96,1.84,2.34);c.restore();}
+   c.clip();c.fillStyle='#624028';c.fillRect(minX,minZ,width,depth);
+   let row=0;for(let z=Math.floor(minZ/.14)*.14;z<maxZ;z+=.14,row++){
+    c.fillStyle=row%3===0?'#805435':row%3===1?'#75482e':'#6d432d';c.fillRect(minX,z,width,.136);
+    c.fillStyle='#41291e';c.fillRect(minX,z+.136,width,.004);
+    for(let x=Math.floor(minX/1.2)*1.2-(row%2)*.6;x<maxX;x+=1.2){c.fillRect(x,z,.006,.136);}
+    c.fillStyle='#b3845d44';for(let k=0;k<3;k++)c.fillRect(minX,z+.025+k*.036,width,.002);
+   }
+   c.restore();
+  },size);
+  const geometry=new T.ShapeGeometry(shape),uv=geometry.getAttribute('uv'),position=geometry.getAttribute('position');
+  for(let n=0;n<position.count;n++)uv.setXY(n,(position.getX(n)-minX)/width,(position.getY(n)+maxZ)/depth);
+  const woodFloor=new T.Mesh(geometry,new T.MeshStandardMaterial({map:seatingFloor,transparent:true,depthWrite:false,roughness:.66}));woodFloor.rotation.x=-Math.PI/2;woodFloor.position.y=.004;woodFloor.receiveShadow=true;scene.add(woodFloor);
+ }
  const ceiling=new T.Mesh(new T.ShapeGeometry(shape),new T.MeshStandardMaterial({color:'#e9e0c7',side:T.DoubleSide}));ceiling.rotation.x=-Math.PI/2;ceiling.position.y=3.3;scene.add(ceiling);
  for(const e of edges(outline)){const g=new T.Group();g.position.set((e.a.x+e.b.x)/2,0,(e.a.z+e.b.z)/2);g.rotation.y=-e.angle*Math.PI/180;scene.add(g);const isEntry=e.i===entry.i;const hasArt=items.some(i=>isArt(i.kind)&&Math.abs(((i.rotation-e.angle+540)%360)-180)<1&&Math.abs((i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz-.16)<.05);const isRestroom=restroom?.edge===e.i;const kitchen=kitchens.find(k=>k.edge===e.i)??(isRestroom?restroom:null);const isKitchen=!!kitchen;const windowWall=(e.nx<-.8||e.nz>.8)&&e.length>3&&!isEntry&&!isKitchen;
  const frame=mat('#135f48',.4),glass=new T.MeshStandardMaterial({color:'#d9eee6',roughness:.16,metalness:.08,transparent:true,opacity:.23,depthWrite:false}),leading=mat('#263f34',.55);

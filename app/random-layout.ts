@@ -3,6 +3,7 @@ import {CATALOG,isArt,bounds,placementError,spawnPoint,snapArt,edges,entrance,ty
 import {intersects} from './geometry';
 import {checkoutStaffArea} from './seating-rules';
 import {createNavigator} from './robot-navigation';
+import {checkoutNeedsScreen,waitingStools,chooseRestroomScreen} from './service-layout';
 const planningNavigator=(items:Item[],outline:Point[],home:Point)=>createNavigator(items,outline,home,{services:false});
 // Sixteen everyday footprints, with a wide-waisted hourglass as a rare exception.
 export function randomRoom(random=Math.random):Point[]{
@@ -44,7 +45,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const initialDoors=planningNavigator(items,outline,spawnPoint(outline,items));reserved=[...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].map(k=>({x:k.door.x+k.nx*.9,z:k.door.z+k.nz*.9,w:k.width+1.1,d:2.8,rotation:edges(outline)[k.edge].angle}));
  reserved.push(...items.filter(i=>i.kind==='checkout').map(checkoutStaffArea));
  const checkout=items.find(i=>i.kind==='checkout');
- if(checkout){const a=checkout.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),side=(entry.x-checkout.x)*c+(entry.z-checkout.z)*sn>0?1:-1;
+ if(checkout&&checkoutNeedsScreen(checkout,items,outline)){const a=checkout.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),side=(entry.x-checkout.x)*c+(entry.z-checkout.z)*sn>0?1:-1;
   for(const sign of[side,-side]){const panel:Item={id:'checkout-screen',kind:'partition',x:checkout.x+c*.82*sign-sn*.08,z:checkout.z+sn*.82*sign+c*.08,rotation:(checkout.rotation+90)%360};if(!reserved.some(r=>intersects(bounds(panel),r))&&!placementError(panel,items,outline)){items.push(panel);serial++;break;}}
  }
  // A sight screen faces the WC opening; guests can enter around either end.
@@ -67,8 +68,11 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  }}
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
+ const doorPortals=[...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])];
+ items.push(...waitingStools(items,outline,doorPortals,reserved,random));
  const dining=planDining(outline,items,reserved,random);
  items.splice(0,items.length,...dining.items);
+ if(wc){const screen=chooseRestroomScreen(items,outline,wc,doorPortals,reserved),old=items.findIndex(i=>i.id==='wc-screen');if(old>=0)items.splice(old,1);if(screen)items.push(screen);}
  const spawn=spawnPoint(outline,items);
  // Choose robot starts after the final screens, from the entrance-connected component.
  const nav=planningNavigator(items,outline,spawn);

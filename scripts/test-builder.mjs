@@ -1,6 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {pathToFileURL} from 'node:url';
 const require=createRequire(path.resolve('package.json')),ts=require('typescript');fs.mkdirSync('work/model-test',{recursive:true});
-for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','dining-planner','random-layout','table-arrangement','decor-placement','edit-operations','layout-review','review-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
+for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','service-layout','dining-planner','random-layout','table-arrangement','decor-placement','edit-operations','layout-review','review-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
 const m=await import(pathToFileURL(path.resolve('work/model-test/floor-plan.mjs'))),g=await import(pathToFileURL(path.resolve('work/model-test/geometry.mjs'))),{createNavigator}=await import(pathToFileURL(path.resolve('work/model-test/robot-navigation.mjs')));
 const initial=m.initialLayout();assert.equal(m.parseDocument({version:2,...initial}).items.length,16);assert.equal(m.parseDocument({version:1,items:initial.items.filter(i=>!m.isArt(i.kind)&&i.kind!=='robot')}).chairStyle,'woven');
 assert.equal(m.parseDocument({version:1,items:[]}).foodEnabled,true);
@@ -68,4 +68,11 @@ console.log('PASS: default kitchen hand basin is placed near its doorway, blocks
 assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'wovenDiamond'}).chairStyle,'wovenDiamond');
 assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'woven'}).chairStyle,'woven');
 console.log('PASS: both woven chair patterns survive layout export and import.');
+
+const {checkoutNeedsScreen,screenBlocksView}=await import(pathToFileURL(path.resolve('work/model-test/service-layout.mjs')));
+const wallCheckout={id:'register-wall',kind:'checkout',x:0,z:-7.45,rotation:0},openCheckout={...wallCheckout,id:'register-open',z:0};
+assert(!checkoutNeedsScreen(wallCheckout,[wallCheckout],m.DEFAULT_OUTLINE),'wall closes rear access');assert(checkoutNeedsScreen(openCheckout,[openCheckout],m.DEFAULT_OUTLINE),'open rear needs a screen');
+const testScreen={id:'screen',kind:'partition',x:0,z:0,rotation:0};assert(screenBlocksView(testScreen,{x:0,z:2},{x:0,z:-2}));assert(!screenBlocksView(testScreen,{x:2,z:2},{x:2,z:-2}));
+assert.equal(savedDefault.items.filter(i=>i.kind==='stool').length,3,'three waiting stools on initial plan');
+console.log('PASS: staff-side screen decisions, restroom line of sight, and three initial waiting stools.');
 

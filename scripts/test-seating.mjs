@@ -30,7 +30,7 @@ let seed=21;const random=()=>((seed=seed*16807%2147483647)-1)/2147483646;
 const ranked=proposals(initialLayout(),undefined,random);assert(ranked.some(p=>p.layout.items.some(i=>i.kind==='bench')),'shared benches appear in standard-room candidates');
 for(const {layout,assessment} of ranked){
  const nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items));assert.equal(assessment.blocked,0);
- const wc=nav.restroom,screen=layout.items.find(i=>i.id==='wc-screen');assert(wc&&screen);assert(Math.abs(Math.hypot(screen.x-wc.door.x,screen.z-wc.door.z)-2.65)<.001);
+ const wc=nav.restroom,screen=layout.items.find(i=>i.id==='wc-screen');assert(wc&&screen);assert(Math.hypot(screen.x-wc.door.x,screen.z-wc.door.z)<3.7);assert(nav.reachable(wc.point,.35));
  for(const bar of layout.items.filter(i=>i.kind==='drinkbar'))for(const portal of nav.kitchens){const clear={x:portal.door.x+portal.nx*.9,z:portal.door.z+portal.nz*.9,w:portal.width+1.1,d:2.8,rotation:edges(layout.outline)[portal.edge].angle};assert(!intersects(bounds(bar),{...clear,w:clear.w+.8,d:clear.d+.4}));}
 }
 console.log('PASS: connected bench seams, 6/8-person table groups, four facing directions, guest access, robot main aisle and partial service, staff-only checkout backs, WC sight screens and kitchen/drinkbar clearance.');
@@ -127,3 +127,4 @@ for(const rotation of[0,90,180,270]){
  assert(!dividerHandrail({...wall,x:rotation===90||rotation===270?6.8:0,z:rotation===0||rotation===180?7.8:0},outline),'wall-adjacent fixed dividers have no rail');
 }
 console.log('PASS: handrails only on joined benches with a clear rear aisle, no rails against walls/windows or rear partitions, in all four orientations.');
+

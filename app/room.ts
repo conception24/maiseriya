@@ -31,8 +31,8 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  function rod(a:T.Vector3,b:T.Vector3,r:number,m:T.Material,p:T.Object3D){const d=b.clone().sub(a);const o=cyl(r,r,d.length(),0,0,0,m,p);o.position.copy(a).add(b).multiplyScalar(.5);o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());return o;}
  function tube(points:T.Vector3[],r:number,m:T.Material,p:T.Object3D){const mesh=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),32,r,8,false),m);mesh.castShadow=true;p.add(mesh);}
  function restroomIcons(c:CanvasRenderingContext2D,x:number,y:number,unit:number){
-  const person=(cx:number,color:string)=>{c.fillStyle=color;c.beginPath();c.arc(cx,y,unit*.105,0,Math.PI*2);c.fill();c.beginPath();c.moveTo(cx-unit*.14,y+unit*.18);c.lineTo(cx+unit*.14,y+unit*.18);c.lineTo(cx,y+unit*.60);c.closePath();c.fill();};
-  person(x,'#202522');person(x+unit*.56,'#c62d3b');
+  const person=(cx:number,color:string,up:boolean)=>{c.fillStyle=color;c.beginPath();c.arc(cx,y,unit*.105,0,Math.PI*2);c.fill();c.beginPath();if(up){c.moveTo(cx,y+unit*.17);c.lineTo(cx-unit*.18,y+unit*.60);c.lineTo(cx+unit*.18,y+unit*.60);}else{c.moveTo(cx-unit*.18,y+unit*.17);c.lineTo(cx+unit*.18,y+unit*.17);c.lineTo(cx,y+unit*.60);}c.closePath();c.fill();};
+  person(x,'#0075be',false);person(x+unit*.56,'#e60020',true);
  }
  // One polygon drives the floor, ceiling, solid walls, windows and entry.
  const tileTex=texture(c=>{
@@ -99,19 +99,19 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  }
 
  else if(isKitchen&&kitchen){const half=kitchen.width/2;const center=(kitchen.door.x-(e.a.x+e.b.x)/2)*e.tx+(kitchen.door.z-(e.a.z+e.b.z)/2)*e.tz;const left=center-half+e.length/2,right=e.length/2-center-half;for(const [w,cx] of [[left,-e.length/2+left/2],[right,e.length/2-right/2]])if(w>0){box(w,3.3,.18,cx,1.65,0,wall,g);box(w,.82,.1,cx,.41,.1,darkwood,g);}box(kitchen.width,1.05,.18,center,2.775,0,wall,g);for(const dx of[-half-.02,half+.02])box(.055,2.25,.2,center+dx,1.125,0,darkwood,g);box(kitchen.width+.06,.055,.2,center,2.25,0,darkwood,g);// Interior-only doorway backdrop: no black volume protrudes outside the room.
- const backdrop=new T.Mesh(new T.PlaneGeometry(kitchen.width,2.25),new T.MeshBasicMaterial({color:'#252a23',side:T.FrontSide}));backdrop.position.set(center,1.125,-.025);g.add(backdrop);if(isRestroom){
+ const backdrop=new T.Mesh(new T.PlaneGeometry(kitchen.width,2.25),new T.MeshBasicMaterial({color:'#252a23',side:T.FrontSide}));backdrop.position.set(center,1.125,-.025);if(!isRestroom)g.add(backdrop);if(isRestroom){
  const doorWood=mat('#b8864f',.52,woodTex),centerWood=mat('#73563b',.53,woodTex),handle=mat('#a9b1ad',.22),dw=kitchen.width-.06,dh=2.19,gw=Math.min(.55,dw*.53),gh=.67,gy=1.55;
  // Wood door with a large glazed upper window and a central darker panel.
  for(const side of[-1,1])box((dw-gw)/2,dh,.055,center+side*(dw+gw)/4,dh/2+.025,.025,doorWood,g);
  const bottom=gy-gh/2,top=gy+gh/2;
  box(gw,bottom-.025,.055,center,(bottom+.025)/2,.025,centerWood,g);
  box(gw,dh+.025-top,.055,center,(dh+.025+top)/2,.025,doorWood,g);
- box(gw,gh,.018,center,gy,.025,new T.MeshStandardMaterial({color:'#c4ddd1',roughness:.24,transparent:true,opacity:.38,depthWrite:false}),g);
+ box(gw,gh,.018,center,gy,.025,new T.MeshStandardMaterial({color:'#d9eee6',roughness:.16,metalness:.08,transparent:true,opacity:.23,depthWrite:false}),g);
  for(const side of[-1,1]){box(.025,gh+.035,.025,center+side*gw/2,gy,.055,handle,g);box(gw+.02,.025,.025,center,gy+side*gh/2,.055,handle,g);}
  box(dw-.03,.15,.018,center,.10,.065,handle,g);
  const hx=center+dw*.37;box(.085,.37,.018,hx,1.0,.066,mat('#585f5b',.3),g);
  for(const y of[.86,1.14])box(.035,.035,.075,hx,y,.10,handle,g);box(.035,.30,.03,hx,1.0,.145,handle,g);
-}const label=texture(c=>{c.fillStyle=isRestroom?'#f3f3e9':'#304839';c.fillRect(0,0,512,512);c.fillStyle=isRestroom?'#27675d':'#eee8ce';c.textAlign='center';if(isRestroom){restroomIcons(c,150,145,250);c.font='bold 115px sans-serif';c.fillText('WC',370,315);}else{c.font='bold 76px sans-serif';c.fillText('KITCHEN',256,285);}});const sign=new T.Mesh(new T.PlaneGeometry(isRestroom?.65:.85,isRestroom?.17:.20),mat('#ffffff',.8,label));sign.position.set(center,isRestroom?2.04:2.45,.105);g.add(sign);}
+}const label=texture(c=>{c.fillStyle=isRestroom?'#f3f3e9':'#304839';c.fillRect(0,0,512,512);c.fillStyle=isRestroom?'#27675d':'#eee8ce';c.textAlign='center';if(isRestroom){c.save();c.scale(1,3.82);restroomIcons(c,100,27,100);c.fillStyle='#31504b';c.font='bold 69px sans-serif';c.fillText('WC',362,95);c.restore();}else{c.font='bold 76px sans-serif';c.fillText('KITCHEN',256,285);}});const sign=new T.Mesh(new T.PlaneGeometry(isRestroom?.65:.85,isRestroom?.17:.20),mat('#ffffff',.8,label));sign.position.set(center,isRestroom?2.04:2.45,.105);g.add(sign);}
  else if(windowWall){
   const count=Math.max(1,Math.ceil(e.length/2.5)),bay=e.length/count;
   for(let j=0;j<count;j++){
@@ -149,23 +149,24 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   if(kind===1){c.moveTo(-65,-45);c.quadraticCurveTo(0,-65,60,-45);c.quadraticCurveTo(28,35,0,106);c.quadraticCurveTo(-38,35,-65,-45);}
   else{c.ellipse(0,0,kind===2?60:70,kind===2?88:62,0,0,Math.PI*2);}c.fill();
   c.strokeStyle='#42613b';c.lineWidth=10;c.beginPath();c.moveTo(0,-55);c.lineTo(5,-95);c.stroke();c.fillStyle='#547849';c.beginPath();c.ellipse(30,-86,30,12,-.4,0,Math.PI*2);c.fill();c.restore();}));
- const panelMat=fabricTextures.map(tex=>mat('#ffffff',.94,tex));
+ const panelSide=mat('#ded8c9',.96),panelMat=fabricTextures.map(tex=>[panelSide,panelSide,panelSide,panelSide,mat('#ffffff',.94,tex),panelSide]);
  let panelIndex=0;const doorsForDecor=[...kitchens,...(restroom?[restroom]:[])];
- for(const site of fabricPanelSites(items,outline,doorsForDecor)){const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.95,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);box(.30,.30,.035,0,0,.12,panelMat[panelIndex++%panelMat.length],g,.002);}
+ for(const site of fabricPanelSites(items,outline,doorsForDecor)){const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.95,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);const board=new T.Mesh(new T.BoxGeometry(.30,.30,.035),panelMat[panelIndex++%panelMat.length]);board.position.z=.1075;g.add(board);}
  // A mirrored column uses its undecorated fourth face; ordinary columns may use any clear face.
  let pillarPanels=0;for(const pillarItem of items.filter(i=>i.kind==='pillar')){if(pillarPanels>=2)break;
-  for(const face of(pillarItem.mirror?[3]:[3,2,1,0])){const a=(pillarItem.rotation-face*90)*Math.PI/180,nx=-Math.sin(a),nz=Math.cos(a),x=pillarItem.x+nx*.47,z=pillarItem.z+nz*.47;
+  for(const face of(pillarItem.mirror?[]:[3,2,1,0])){const a=(pillarItem.rotation-face*90)*Math.PI/180,nx=-Math.sin(a),nz=Math.cos(a),x=pillarItem.x+nx*.4275,z=pillarItem.z+nz*.4275;
    const probe={x,z,w:.29,d:.12,rotation:(pillarItem.rotation-face*90+360)%360};if(!inside({x:x+nx*.15,z:z+nz*.15},outline)||items.some(i=>i.id!==pillarItem.id&&!isArt(i.kind)&&i.kind!=='robot'&&intersects(probe,bounds(i))))continue;
-   const g=new T.Group();g.position.set(x,1.98,z);g.rotation.y=-a;scene.add(g);box(.30,.30,.035,0,0,0,panelMat[panelIndex++%panelMat.length],g,.002);pillarPanels++;break;
+   const g=new T.Group();g.position.set(x,1.98,z);g.rotation.y=-a;scene.add(g);const board=new T.Mesh(new T.BoxGeometry(.30,.30,.035),panelMat[panelIndex++%panelMat.length]);g.add(board);pillarPanels++;break;
   }
  }
  // Suspended green restroom direction signs along the route from the entrance.
- if(restroom){const signTex=(direction:number)=>texture(c=>{c.fillStyle='#1d664b';c.fillRect(0,0,512,512);c.fillStyle='#f8f6e9';restroomIcons(c,135,130,250);c.fillStyle='#f8f6e9';c.beginPath();if(direction>0){c.moveTo(330,206);c.lineTo(405,206);c.lineTo(405,160);c.lineTo(475,255);c.lineTo(405,350);c.lineTo(405,304);c.lineTo(330,304);}else{c.moveTo(475,206);c.lineTo(400,206);c.lineTo(400,160);c.lineTo(330,255);c.lineTo(400,350);c.lineTo(400,304);c.lineTo(475,304);}c.closePath();c.fill();});
+ if(restroom){const signTex=(direction:number)=>texture(c=>{c.fillStyle='#1d664b';c.fillRect(0,0,512,512);c.save();c.scale(1,2.88);restroomIcons(c,105,47,105);c.restore();c.fillStyle='#f8f6e9';c.beginPath();if(direction>0){c.moveTo(330,206);c.lineTo(405,206);c.lineTo(405,160);c.lineTo(475,255);c.lineTo(405,350);c.lineTo(405,304);c.lineTo(330,304);}else{c.moveTo(475,206);c.lineTo(400,206);c.lineTo(400,160);c.lineTo(330,255);c.lineTo(400,350);c.lineTo(400,304);c.lineTo(475,304);}c.closePath();c.fill();});
   const forward=signTex(1),backward=signTex(-1),positions:Point[]=[],nav=createNavigator(items,outline,spawn,{services:false}),route=nav.aisleRoute(spawn,restroom.point);
-  const candidates=[.42,.72,.20,.85].map(t=>{if(route.length){const index=Math.min(route.length-1,Math.floor((route.length-1)*t));return{point:route[index],next:route[Math.min(route.length-1,index+16)]};}return{point:{x:entry.x+(restroom.door.x-entry.x)*t,z:entry.z+(restroom.door.z-entry.z)*t},next:restroom.point};});
-  candidates.push({point:spawn,next:route[Math.min(route.length-1,16)]??restroom.point});
-  for(const candidate of candidates){if(positions.length>=2)break;const {x,z}=candidate.point;if(!canWalk(x,z,[],outline,.4)||positions.some(p=>Math.hypot(x-p.x,z-p.z)<3))continue;positions.push({x,z});
-   const g=new T.Group(),angle=Math.atan2(candidate.next.z-z,candidate.next.x-x);g.position.set(x,3.27,z);g.rotation.y=-angle;scene.add(g);
+  const candidates=[.42,.60,.20,.72].map(t=>{if(route.length){const index=Math.min(route.length-1,Math.floor((route.length-1)*t));return{point:route[index],next:route[Math.min(route.length-1,index+4)]};}return{point:{x:entry.x+(restroom.door.x-entry.x)*t,z:entry.z+(restroom.door.z-entry.z)*t},next:restroom.point};});
+  if(route.length)candidates.push({point:spawn,next:route[Math.min(route.length-1,4)]});
+  if(!route.length)candidates.length=0;
+  for(const candidate of candidates){if(positions.length>=2)break;const {x,z}=candidate.point;if(Math.hypot(x-restroom.door.x,z-restroom.door.z)<3.5||!canWalk(x,z,[],outline,.4)||positions.some(p=>Math.hypot(x-p.x,z-p.z)<3))continue;positions.push({x,z});
+   const g=new T.Group(),angle=Math.atan2(-(candidate.next.z-z),candidate.next.x-x);g.position.set(x,3.27,z);g.rotation.y=-angle;scene.add(g);
    for(const xSide of[-.25,.25])rod(new T.Vector3(xSide,0,0),new T.Vector3(xSide,-.20,0),.006,metal,g);
    const front=new T.Mesh(new T.PlaneGeometry(.72,.25),new T.MeshBasicMaterial({map:forward,side:T.FrontSide}));front.position.set(0,-.32,.008);g.add(front);
    const back=new T.Mesh(new T.PlaneGeometry(.72,.25),new T.MeshBasicMaterial({map:backward,side:T.FrontSide}));back.position.set(0,-.32,-.008);back.rotation.y=Math.PI;g.add(back);
@@ -276,7 +277,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
    pillarMirror=new T.MeshStandardMaterial({color:'#c4cfca',metalness:.92,roughness:.16,envMap:env,envMapIntensity:.85});
   }
   // Three decorated faces; the fourth retains the same plaster as the walls.
-  for(let face=0;face<3;face++){
+  for(let face=0;face<4;face++){
    const panel=new T.Group();panel.rotation.y=face*Math.PI/2;g.add(panel);
    for(const x of[-.255,.255])box(.31,2.32,.008,x,2.05,.415,pillarMirror,panel);
    const tileAccent=mat(face%2?'#245d45':'#b42635',.28),pitch=.2/3;
@@ -418,7 +419,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  }
  const benchRuns=continuousBenches(items),benchRunById=new Map<string,Item[]>();
  for(const run of benchRuns)if(run.length>1)for(const member of run)benchRunById.set(member.id,run);
- for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'stool':g.userData.seat='chair';cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.43,.045,x*.15,.23,z*.15,wood,g,.01);leg.rotation.z=x*-.08;box(.055,.025,.055,x*.135,.426,z*.15,wood,g,.008);}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':{const run=benchRunById.get(item.id);if(!run){bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;}if(run[0].id!==item.id)break;
+ for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'waitingStand':box(.4,.98,.35,0,.49,0,darkwood,g,.01);box(.45,.04,.4,0,1.0,0,top,g,.008);box(.24,.008,.30,0,1.028,0,mat('#fffef4'),g);for(let n=0;n<6;n++)box(.19,.002,.002,0,1.034,-.105+n*.035,mat('#b3b0a4'),g);break;case 'stool':g.userData.seat='chair';cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.43,.045,x*.15,.23,z*.15,wood,g,.01);leg.rotation.z=x*-.08;box(.055,.025,.055,x*.135,.426,z*.15,wood,g,.008);}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':{const run=benchRunById.get(item.id);if(!run){bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;}if(run[0].id!==item.id)break;
  const first=run[0],last=run[run.length-1],a=item.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),length=1.84+(last.x-first.x)*c+(last.z-first.z)*sn;
  const sofa=bench((length-1.84)/2,0,0,g,false,false,length);
  for(const member of run)if(benchRearHandrail(member,items,outline)){const rail=new T.Group();rail.position.x=(member.x-first.x)*c+(member.z-first.z)*sn-(length-1.84)/2;sofa.add(rail);if(member.screen)privacyScreen(rail,1.84,.30,1.17);else handrail(rail,1.84,.30,1.26);}

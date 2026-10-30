@@ -30,19 +30,21 @@ export function waitingStools(items:Item[],outline:Point[],portals:Portal[],rese
  for(const wall of edges(outline))if(Math.abs(wall.angle%90)<.01&&wall.length>1.5)supports.push({x:wall.a.x,z:wall.a.z,tx:wall.tx,tz:wall.tz,nx:wall.nx,nz:wall.nz,length:wall.length,angle:wall.angle});
  for(const item of items.filter(i=>i.id!=='wc-screen'&&['partition','dividerWall','bench'].includes(i.kind))){const a=item.rotation*Math.PI/180,tx=Math.cos(a),tz=Math.sin(a),length=CATALOG[item.kind].w,half=CATALOG[item.kind].d/2;
   for(const side of(item.kind==='bench'?[1]:[-1,1])){const nx=-Math.sin(a)*side,nz=Math.cos(a)*side;supports.push({x:item.x-tx*length/2+nx*half,z:item.z-tz*length/2+nz*half,tx,tz,nx,nz,length,angle:item.rotation});}}
- const candidates:{stools:Item[];distance:number}[]=[];
- for(const support of supports)for(let start=.25;start<=support.length-1.37;start+=.28){const stools:Item[]=[0,.56,1.12].map((offset,n)=>({id:`waiting-stool-${n+1}`,kind:'stool',x:support.x+support.tx*(start+offset)+support.nx*.31,z:support.z+support.tz*(start+offset)+support.nz*.31,rotation:Math.round(support.angle/90)*90%360}));
-  const distance=Math.hypot(stools[1].x-checkout.x,stools[1].z-checkout.z);if(distance>4.4)continue;
-  if(stools.some((i,n)=>placementError(i,[...items,...stools.slice(0,n)],outline)||[...reserved,entranceZone].some(r=>intersects(bounds(i),r))||Math.hypot(i.x-front.x,i.z-front.z)<.8))continue;
-  candidates.push({stools,distance:distance+random()*.15});
+ const tieBreak=random();const candidates:{stool:Item;distance:number}[]=[];
+ for(const support of supports)for(let t=.27;t<=support.length-.27;t+=.38){const stool:Item={id:'waiting-candidate',kind:'stool',x:support.x+support.tx*t+support.nx*.39,z:support.z+support.tz*t+support.nz*.39,rotation:(Math.round(support.angle/90)*90+360)%360};
+  const distance=Math.hypot(stool.x-checkout.x,stool.z-checkout.z);if(distance>6||Math.hypot(stool.x-e.x,stool.z-e.z)>7)continue;
+  if(placementError(stool,items,outline)||[...reserved,entranceZone].some(r=>intersects(bounds(stool),r))||Math.hypot(stool.x-front.x,stool.z-front.z)<.9)continue;
+  candidates.push({stool,distance:distance+tieBreak*.01});
  }
  candidates.sort((a,b)=>a.distance-b.distance);
- for(const {stools} of candidates){const all=[...items,...stools],nav=createNavigator(all,outline,spawnPoint(outline,all),{services:false});
-  if(!portals.every(p=>nav.reachable(p.point,.35))||!nav.reachable(front,.35))continue;
-  if(!stools.every(i=>[[-.55,0],[.55,0],[0,.55],[0,-.55]].some(([dx,dz])=>nav.reachable({x:i.x+dx,z:i.z+dz},.3))))continue;
-  return stools;
+ const existing=items.filter(i=>i.kind==='stool');const chosen:Item[]=[];
+ for(const {stool} of candidates){if(chosen.length+existing.length>=10)break;if([...existing,...chosen].some(i=>Math.hypot(i.x-stool.x,i.z-stool.z)<.70))continue;
+  const next={...stool,id:`waiting-stool-${existing.length+chosen.length+1}`},all=[...items,...chosen,next];
+  const nav=createNavigator(all,outline,spawnPoint(outline,all),{services:false});
+  if(!portals.every(p=>nav.reachable(p.point,.35))||!nav.reachable(front,.35)||![[-.6,0],[.6,0],[0,.6],[0,-.6]].some(([dx,dz])=>nav.reachable({x:next.x+dx,z:next.z+dz},.3)))continue;
+  chosen.push(next);
  }
- return [];
+ return chosen;
 }
 
 export function screenBlocksView(screen:Item,from:Point,to:Point){

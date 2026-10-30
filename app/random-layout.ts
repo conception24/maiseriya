@@ -60,19 +60,23 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   sink:for(const offset of[k.width/2+.38,k.width/2+.7,k.width/2+1.05, k.width/2+1.4])for(const sign of[1,-1]){
    const x=k.door.x+wall.tx*offset*sign+wall.nx*.32,z=k.door.z+wall.tz*offset*sign+wall.nz*.32;
    const sink:Item={id:'staff-sink',kind:'staffSink',x,z,rotation:(wall.angle+360)%360};
-   if(placementError(sink,items,outline))continue;
+   const useArea={x:x+wall.nx*.65,z:z+wall.nz*.65,w:.7,d:.85,rotation:wall.angle};
+   if(placementError(sink,items,outline)||items.filter(i=>i.kind==='checkout').some(i=>intersects(useArea,bounds(i))))continue;
    const nav=planningNavigator([...items,sink],outline,spawnPoint(outline,[...items,sink]));
    if(![...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])].every(p=>nav.reachable(p.point,.35)))continue;
-   items.push(sink);break sink;
+   items.push(sink);reserved.push(useArea);break sink;
   }
  }}
  // A wall-side refreshment counter, with its serving side facing the room.
  bar:for(const e of edges(outline).filter(e=>Math.abs(e.angle%90)<.01&&e.i!==entry.i).sort((a,b)=>b.length-a.length))for(let t=1.5;t<e.length-1.4;t+=1.5){if(add('drinkbar',e.a.x+e.tx*t+e.nx*.55,e.a.z+e.tz*t+e.nz*.55,(e.angle+360)%360))break bar;}
  const doorPortals=[...initialDoors.kitchens,...(initialDoors.restroom?[initialDoors.restroom]:[])];
+ if(checkout){const a=checkout.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);stand:for(const side of[-1,1])for(const v of[.6,1,1.4]){const stand:Item={id:'waiting-stand',kind:'waitingStand',x:checkout.x+c*side*1.05-sn*v,z:checkout.z+sn*side*1.05+c*v,rotation:checkout.rotation};if(placementError(stand,items,outline)||reserved.some(r=>intersects(bounds(stand),r)))continue;const nav=planningNavigator([...items,stand],outline,spawnPoint(outline,[...items,stand]));if(!doorPortals.every(p=>nav.reachable(p.point,.35)))continue;items.push(stand);break stand;}}
+
  items.push(...waitingStools(items,outline,doorPortals,reserved,random));
  const dining=planDining(outline,items,reserved,random);
  items.splice(0,items.length,...dining.items);
  if(wc){const screen=chooseRestroomScreen(items,outline,wc,doorPortals,reserved),old=items.findIndex(i=>i.id==='wc-screen');if(old>=0)items.splice(old,1);if(screen)items.push(screen);}
+ items.push(...waitingStools(items,outline,doorPortals,reserved,random));
  const spawn=spawnPoint(outline,items);
  // Choose robot starts after the final screens, from the entrance-connected component.
  const nav=planningNavigator(items,outline,spawn);

@@ -73,6 +73,6 @@ const {checkoutNeedsScreen,screenBlocksView}=await import(pathToFileURL(path.res
 const wallCheckout={id:'register-wall',kind:'checkout',x:0,z:-7.45,rotation:0},openCheckout={...wallCheckout,id:'register-open',z:0};
 assert(!checkoutNeedsScreen(wallCheckout,[wallCheckout],m.DEFAULT_OUTLINE),'wall closes rear access');assert(checkoutNeedsScreen(openCheckout,[openCheckout],m.DEFAULT_OUTLINE),'open rear needs a screen');
 const testScreen={id:'screen',kind:'partition',x:0,z:0,rotation:0};assert(screenBlocksView(testScreen,{x:0,z:2},{x:0,z:-2}));assert(!screenBlocksView(testScreen,{x:2,z:2},{x:2,z:-2}));
-assert.equal(savedDefault.items.filter(i=>i.kind==='stool').length,3,'three waiting stools on initial plan');
-console.log('PASS: staff-side screen decisions, restroom line of sight, and three initial waiting stools.');
+assert(savedDefault.items.filter(i=>i.kind==='stool').length>=5,'initial waiting stools');assert(savedDefault.items.some(i=>i.kind==='waitingStand'),'initial waiting list stand');
+console.log('PASS: staff-side screen decisions, restroom line of sight, and initial waiting stools.');
 

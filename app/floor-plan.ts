@@ -1,11 +1,12 @@
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool' | 'staffSink';
+export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool' | 'staffSink' | 'waitingStand';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside';mirror?:boolean;screen?:boolean;logoStyle?:'color'|'mono'|'letters'};
 export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'wovenDiamond'|'gray'|'perforated';foodEnabled?:boolean;drinkbarStyle?:'wood'|'tile';invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
 export type Rect = {x:number;z:number;w:number;d:number;rotation:number};
 export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:number;seats:number}>={
+ waitingStand:{name:'順番待ち記名台',description:'受付の名前を書くための記名台',w:.45,d:.4,seats:0},
  staffSink:{name:'従業員用手洗い',description:'厨房脇の小さな手洗い・石けんとペーパー付き',w:.58,d:.42,seats:0},
  stool:{name:'待合スツール',description:'丸い木製座面と曲げ脚・入口付近の待合用',w:.42,d:.42,seats:0},
  two:{name:'2人席セット',description:'テーブル＋切替式チェア2脚',w:.86,d:1.95,seats:2},

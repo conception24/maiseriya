@@ -15,7 +15,7 @@ import {rackOwner} from './table-arrangement';
 import {continuousBenches} from './seating-rules';
 import defaultLayout from './default-layout.json';
 import {RoomShapeEditor} from './room-shape-editor';
-const kinds=['stool','two','four','table','wideTable','chair','bench','partition','dividerWall','pillar','plant','venus','primavera','cherubs','adam','annunciation','athens','logo','robot','checkout','drinkbar','serviceTable','staffSink'] as Kind[];
+const kinds=['waitingStand','stool','two','four','table','wideTable','chair','bench','partition','dividerWall','pillar','plant','venus','primavera','cherubs','adam','annunciation','athens','logo','robot','checkout','drinkbar','serviceTable','staffSink'] as Kind[];
 function Furniture({kind,showRack=true,length=1.84}:{kind:Kind;showRack?:boolean;length?:number}) {
  const table=(wide=false)=><g><rect x={wide?-.765:-.41} y={-.39} width={wide?1.53:.82} height={.78} rx={.045} fill="#d5ad76" stroke="#8d673d" strokeWidth={.035}/><path d={wide?'M-.6,-.15 H.6 M-.6,.08 H.6':'M-.28,-.15 H.28 M-.28,.08 H.28'} stroke="#b68a56" strokeWidth={.018} opacity={.55}/>{showRack&&<rect x={wide?.48:.17} y={-.28} width={.18} height={.33} rx={.01} fill="#e8eee0" stroke="#4a925e" strokeWidth={.018}/>}</g>;
  const chair=<g className="chair-glyph"><rect x={-.22} y={-.21} width={.44} height={.43} rx={.13} fill="#376347" stroke="#19472e" strokeWidth={.028}/><path d="M-.245,.01 Q-.28,.29 0,.28 Q.28,.29 .245,.01" fill="none" stroke="#b9945e" strokeWidth={.065}/></g>;

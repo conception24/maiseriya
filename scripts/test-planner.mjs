@@ -53,3 +53,32 @@ for(const width of [1.2,1.5,2.1,3.6]){
  if(width<=2.1)assert.equal(result.aisleExcess,0);else assert(result.aisleExcess>0);
 }
 console.log('PASS: 1.2–2.1m corridors are not penalized; unnecessarily wide corridors are.');
+
+// Regression: a clear collision test alone is insufficient at column/service pinch points.
+const {narrowZoneGap,entranceSeatExposed,furnishingBlocksView}=await import('../work/model-test/service-layout.mjs');
+const {entrance,bounds}=await import('../work/model-test/floor-plan.mjs');
+const {intersects}=await import('../work/model-test/geometry.mjs');
+for(const rotation of [0,90]){
+ const a={x:0,z:0,w:1,d:2,rotation},along=rotation===0?'x':'z';
+ for(const gap of [.02,.5,1.19,1.2,1.5]){const b={...a,[along]:1+gap};assert.equal(narrowZoneGap(a,b),gap>.15&&gap<1.2);}
+}
+const e=entrance(base.outline),seat={id:'entry-seat',kind:'chair',x:e.x+e.nx*3.6,z:e.z+e.nz*3.6,rotation:0};
+assert(entranceSeatExposed(seat,[seat],base.outline));
+const screen={id:'privacy',kind:'dividerWall',x:e.x+e.nx*2.6,z:e.z+e.nz*2.6,rotation:e.angle};
+assert(!entranceSeatExposed(seat,[seat,screen],base.outline));
+for(const seed of [21,137,12345,812]){
+ const layout=randomArrangement(base,rng(seed)),entry=entrance(layout.outline);
+ assert(!layout.items.some(i=>entranceSeatExposed(i,layout.items,layout.outline)));
+ // Every interior fixed-wall component must connect to the column structure.
+ const structure=layout.items.filter(i=>['pillar','dividerWall'].includes(i.kind));
+ const linked=new Set(structure.filter(i=>i.kind==='pillar').map(i=>i.id));
+ for(let pass=0;pass<structure.length;pass++)for(const item of structure)
+  if(structure.some(other=>linked.has(other.id)&&intersects(bounds(item),bounds(other),.12)))linked.add(item.id);
+ assert(structure.every(i=>linked.has(i.id)),'no isolated bench bay with its own detached backing wall');
+ for(const stool of layout.items.filter(i=>i.kind==='stool')){
+  assert(Math.hypot(stool.x-entry.x,stool.z-entry.z)<=4.8);
+  assert(!layout.items.some(i=>['partition','dividerWall','pillar','bench','four'].includes(i.kind)&&furnishingBlocksView(i,stool,{x:entry.x+entry.nx*.6,z:entry.z+entry.nz*.6})));
+ }
+ for(const supply of layout.items.filter(i=>i.kind==='serviceTable'))for(const other of layout.items.filter(i=>['table','chair','bench','two','four','pillar','dividerWall'].includes(i.kind)))assert(!narrowZoneGap(bounds(supply),bounds(other)));
+}
+console.log('PASS: entrance privacy, entrance-side waiting, and 1.2m column/service passage boundaries.');

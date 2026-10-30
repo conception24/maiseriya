@@ -32,8 +32,14 @@ export function waitingStools(items:Item[],outline:Point[],portals:Portal[],rese
   for(const side of(item.kind==='bench'?[1]:[-1,1])){const nx=-Math.sin(a)*side,nz=Math.cos(a)*side;supports.push({x:item.x-tx*length/2+nx*half,z:item.z-tz*length/2+nz*half,tx,tz,nx,nz,length,angle:item.rotation});}}
  const tieBreak=random();const candidates:{stool:Item;distance:number}[]=[];
  for(const support of supports)for(let t=.27;t<=support.length-.27;t+=.38){const stool:Item={id:'waiting-candidate',kind:'stool',x:support.x+support.tx*t+support.nx*.39,z:support.z+support.tz*t+support.nz*.39,rotation:(Math.round(support.angle/90)*90+360)%360};
-  const distance=Math.hypot(stool.x-checkout.x,stool.z-checkout.z);if(distance>6||Math.hypot(stool.x-e.x,stool.z-e.z)>7)continue;
+  const distance=Math.hypot(stool.x-checkout.x,stool.z-checkout.z);if(distance>4.5||Math.hypot(stool.x-e.x,stool.z-e.z)>4.8)continue;
+  // Waiting belongs on the entrance-facing side, never across a dining divider.
+  const lobby={x:e.x+e.nx*.6,z:e.z+e.nz*.6};
+  if(items.some(i=>['partition','dividerWall','pillar','bench','four'].includes(i.kind)&&furnishingBlocksView(i,stool,lobby)))continue;
   if(placementError(stool,items,outline)||[...reserved,entranceZone].some(r=>intersects(bounds(stool),r))||Math.hypot(stool.x-front.x,stool.z-front.z)<.9)continue;
+  const approach={x:stool.x+support.nx*.8,z:stool.z+support.nz*.8,w:.65,d:1.2,rotation:support.angle};
+  if(items.some(i=>intersects(approach,bounds(i))))continue;
+  stool.rotation=(support.angle+(support.nx*(-Math.sin(support.angle*Math.PI/180))+support.nz*Math.cos(support.angle*Math.PI/180)<0?180:0)+360)%360;
   candidates.push({stool,distance:distance+tieBreak*.01});
  }
  candidates.sort((a,b)=>a.distance-b.distance);
@@ -94,4 +100,23 @@ export function chooseRestroomScreen(items:Item[],outline:Point[],wc:Portal,port
   return screen;
  }
  return null;
+}
+
+// Separate seating/service zones must either join or leave a real passage.
+// Internal gaps within a table-and-chair module are not circulation routes.
+export function narrowZoneGap(a:Rect,b:Rect){
+ if(Math.abs(a.rotation%90)>.001||Math.abs(b.rotation%90)>.001)return false;
+ const extent=(r:Rect)=>{const t=r.rotation*Math.PI/180,c=Math.abs(Math.cos(t)),s=Math.abs(Math.sin(t));return{w:c*r.w+s*r.d,d:s*r.w+c*r.d};};
+ const x=extent(a),y=extent(b),dx=Math.abs(a.x-b.x),dz=Math.abs(a.z-b.z);
+ const gx=dx-(x.w+y.w)/2,gz=dz-(x.d+y.d)/2;
+ const ox=Math.min(a.x+x.w/2,b.x+y.w/2)-Math.max(a.x-x.w/2,b.x-y.w/2);
+ const oz=Math.min(a.z+x.d/2,b.z+y.d/2)-Math.max(a.z-x.d/2,b.z-y.d/2);
+ return (gx>.15&&gx<1.2-1e-6&&oz>.45)||(gz>.15&&gz<1.2-1e-6&&ox>.45);
+}
+export function entranceSeatExposed(seat:Item,all:Item[],outline:Point[]){
+ if(!['chair','table','two','four'].includes(seat.kind))return false;
+ const e=entrance(outline),dx=seat.x-e.x,dz=seat.z-e.z;
+ if(Math.abs(dx*e.tx+dz*e.tz)>e.width/2+1.2||dx*e.nx+dz*e.nz>4.2)return false;
+ const from={x:e.x+e.nx*.5,z:e.z+e.nz*.5};
+ return !all.some(i=>i.id!==seat.id&&['partition','dividerWall','pillar','bench','four'].includes(i.kind)&&furnishingBlocksView(i,from,seat));
 }

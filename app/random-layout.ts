@@ -73,7 +73,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const dining=planDining(outline,items,reserved,random);
  items.splice(0,items.length,...dining.items);
  if(wc){const screen=chooseRestroomScreen(items,outline,wc,doorPortals,reserved),old=items.findIndex(i=>i.id==='wc-screen');if(old>=0)items.splice(old,1);if(screen)items.push(screen);}
- items.push(...waitingStools(items,outline,doorPortals,reserved,random));
+ // Waiting is planned before dining; never fill leftover dining-side pockets with stools.
  const spawn=spawnPoint(outline,items);
  // Choose robot starts after the final screens, from the entrance-connected component.
  const nav=planningNavigator(items,outline,spawn);

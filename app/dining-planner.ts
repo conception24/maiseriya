@@ -1,4 +1,5 @@
 import {CATALOG,bounds,edges,entrance,spawnPoint,isArt,type Item,type Point,type Rect} from './floor-plan';
+import {narrowZoneGap,entranceSeatExposed} from './service-layout';
 import {area,intersects,rectInRoom,segmentDistance} from './geometry';
 import {createNavigator} from './robot-navigation';
 import {chairClearance} from './layout-quality';
@@ -10,7 +11,7 @@ type Zone={items:Item[];aisles:Rect[];score:number};
 type Nav=ReturnType<typeof createNavigator>;
 const turn=(angle:number)=>(angle+360)%360;
 const structuralPitch=4.52; // .82m column + two 1.84m bench/wall bays + 2cm joint.
-const mainWidth=1.45,guestWidth=1.0;
+const mainWidth=1.5,guestWidth=1.2;
 export class LayoutPlanningError extends Error {}
 export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],random:()=>number,attempt=0){
  const entry=entrance(outline),wallEdges=edges(outline),xs=outline.map(p=>p.x),zs=outline.map(p=>p.z);
@@ -20,6 +21,8 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const portals=navFor(items),destinations=[...portals.kitchens,...(portals.restroom?[portals.restroom]:[])].map(p=>p.point);
  const fronts=fixtures.filter(i=>['checkout','drinkbar'].includes(i.kind)).map(i=>{const a=i.rotation*Math.PI/180;return{x:i.x-Math.sin(a)*.94,z:i.z+Math.cos(a)*.94,w:CATALOG[i.kind].w,d:1.15,rotation:i.rotation};});
  hard.push(...fronts);
+ // Waiting guests need leg room and a connected approach, reserved before dining.
+ for(const stool of fixtures.filter(i=>i.kind==='stool')){const a=stool.rotation*Math.PI/180;hard.push({x:stool.x-Math.sin(a)*.8,z:stool.z+Math.cos(a)*.8,w:.65,d:1.2,rotation:stool.rotation});}
  let serial=0;
  const local=(x:number,z:number,rotation:number)=>{
   const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
@@ -42,6 +45,10 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
     return t+along>0&&t-along<e.length&&gap>.15&&gap<1.2;
    }));
   if(stranded)return false;
+  const all=[...items,...zone.items];
+  if(zone.items.some(i=>entranceSeatExposed(i,all,outline)))return false;
+  const structure=(i:Item)=>['pillar','dividerWall','partition','serviceTable'].includes(i.kind);
+  if(zone.items.some(i=>items.some(j=>(structure(i)||structure(j))&&narrowZoneGap(bounds(i),bounds(j)))))return false;
   const proposed=zone.items.map(bounds);
   // Reject occupied sites before the more expensive concave-room containment test.
   // Zones contain ordinary furniture only; the entry exclusion is already in hard.
@@ -86,7 +93,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  }
  // Search whole architectural arrangements, not independent random column positions.
  const cores:Zone[]=[],preferRotation=random()<.5?0:90,preferSide=random()<.5?1:-1;
- const offsetX=Math.round(random()*2)*.25,offsetZ=Math.round(random()*2)*.25;
+ const offsetX=Math.round(random()*5)*.1,offsetZ=Math.round(random()*5)*.1;
  for(const count of[3,4])for(const rotation of[preferRotation,90-preferRotation]){
   const along=rotation===0?maxX-minX:maxZ-minZ;if(along<(count-1)*structuralPitch+1.05)continue;
   for(let z=minZ+1.85+offsetZ;z<maxZ-1.8;z+=(attempt?.25:.5))for(let x=minX+1.85+offsetX;x<maxX-1.8;x+=(attempt?.25:.5)){
@@ -207,6 +214,10 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
     zone.aisles.push(f.rect(0,side*3,modules*1.84+.5,mainWidth));
    }
    if(sides.length===1)zone.aisles.push(f.rect(0,-sides[0]*.75,modules*1.84+.5,guestWidth));
+   // Optional bays extend existing architecture; a private backing panel
+   // alone does not make an isolated island a useful seating zone.
+   const backing=zone.items.filter(i=>i.kind==='dividerWall');
+   if(!backing.some(i=>items.some(j=>['pillar','dividerWall','partition'].includes(j.kind)&&intersects(bounds(i),bounds(j),.12))))continue;
    if(!fits(zone))continue;
    const nearest=Math.min(...items.filter(i=>!isArt(i.kind)).map(i=>Math.hypot(i.x-x,i.z-z)));
    zone.score=modules*sides.length*3+Math.min(4,nearest)+(rotation===coreAxis?.8:0)+random()*.25;

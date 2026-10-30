@@ -1,4 +1,4 @@
-import {bounds,colliders,edges,entrance,placementError,spawnPoint,type Item,type Point,type Rect} from './floor-plan';
+import {bounds,colliders,edges,entrance,placementError,spawnPoint,CATALOG,type Item,type Point,type Rect} from './floor-plan';
 import {createCircleChecker,intersects} from './geometry';
 import {createNavigator} from './robot-navigation';
 import {chairClearance} from './layout-quality';
@@ -25,11 +25,19 @@ export function waitingStools(items:Item[],outline:Point[],portals:Portal[],rese
  const e=entrance(outline),a=checkout.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
  const entranceZone={x:e.x+e.nx*1.65,z:e.z+e.nz*1.65,w:e.width,d:3.3,rotation:e.angle};
  const front={x:checkout.x-s*.95,z:checkout.z+c*.95};
- const sides=random()<.5?[-1,1]:[1,-1],depths=random()<.5?[1.2,1.8,2.35,2.9]:[1.8,1.2,2.35,2.9];
- for(const side of sides)for(const v of depths)for(const center of[1.8,2.35,2.9]){
-  const stools:Item[]=[-.56,0,.56].map((offset,n)=>{const u=side*center+offset;return{id:`waiting-stool-${n+1}`,kind:'stool',x:checkout.x+c*u-s*v,z:checkout.z+s*u+c*v,rotation:checkout.rotation};});
+ // Each row is anchored to a wall, partition, or the back of a bench.
+ const supports:{x:number;z:number;tx:number;tz:number;nx:number;nz:number;length:number;angle:number}[]=[];
+ for(const wall of edges(outline))if(Math.abs(wall.angle%90)<.01&&wall.length>1.5)supports.push({x:wall.a.x,z:wall.a.z,tx:wall.tx,tz:wall.tz,nx:wall.nx,nz:wall.nz,length:wall.length,angle:wall.angle});
+ for(const item of items.filter(i=>i.id!=='wc-screen'&&['partition','dividerWall','bench'].includes(i.kind))){const a=item.rotation*Math.PI/180,tx=Math.cos(a),tz=Math.sin(a),length=CATALOG[item.kind].w,half=CATALOG[item.kind].d/2;
+  for(const side of(item.kind==='bench'?[1]:[-1,1])){const nx=-Math.sin(a)*side,nz=Math.cos(a)*side;supports.push({x:item.x-tx*length/2+nx*half,z:item.z-tz*length/2+nz*half,tx,tz,nx,nz,length,angle:item.rotation});}}
+ const candidates:{stools:Item[];distance:number}[]=[];
+ for(const support of supports)for(let start=.25;start<=support.length-1.37;start+=.28){const stools:Item[]=[0,.56,1.12].map((offset,n)=>({id:`waiting-stool-${n+1}`,kind:'stool',x:support.x+support.tx*(start+offset)+support.nx*.31,z:support.z+support.tz*(start+offset)+support.nz*.31,rotation:Math.round(support.angle/90)*90%360}));
+  const distance=Math.hypot(stools[1].x-checkout.x,stools[1].z-checkout.z);if(distance>4.4)continue;
   if(stools.some((i,n)=>placementError(i,[...items,...stools.slice(0,n)],outline)||[...reserved,entranceZone].some(r=>intersects(bounds(i),r))||Math.hypot(i.x-front.x,i.z-front.z)<.8))continue;
-  const all=[...items,...stools],nav=createNavigator(all,outline,spawnPoint(outline,all),{services:false});
+  candidates.push({stools,distance:distance+random()*.15});
+ }
+ candidates.sort((a,b)=>a.distance-b.distance);
+ for(const {stools} of candidates){const all=[...items,...stools],nav=createNavigator(all,outline,spawnPoint(outline,all),{services:false});
   if(!portals.every(p=>nav.reachable(p.point,.35))||!nav.reachable(front,.35))continue;
   if(!stools.every(i=>[[-.55,0],[.55,0],[0,.55],[0,-.55]].some(([dx,dz])=>nav.reachable({x:i.x+dx,z:i.z+dz},.3))))continue;
   return stools;

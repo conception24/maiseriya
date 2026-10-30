@@ -23,7 +23,7 @@ for(let seed=1;seed<=20;seed++){
   }
  }
  if(windows.length){windowCases++;if(found)withWindowBench++;}
- const stools=layout.items.filter(i=>i.kind==='stool'),checkout=layout.items.find(i=>i.kind==='checkout');assert(stools.length===0||stools.length===3);if(stools.length===3){stoolRooms++;assert(stools.every(i=>Math.hypot(i.x-checkout.x,i.z-checkout.z)<4.7));}
+ const stools=layout.items.filter(i=>i.kind==='stool'),checkout=layout.items.find(i=>i.kind==='checkout');assert(stools.length===0||stools.length===3);if(stools.length===3){stoolRooms++;assert(stools.every(i=>Math.hypot(i.x-checkout.x,i.z-checkout.z)<4.7));for(const stool of stools){const wall=edges(outline).some(e=>{const t=(stool.x-e.a.x)*e.tx+(stool.z-e.a.z)*e.tz,d=(stool.x-e.a.x)*e.nx+(stool.z-e.a.z)*e.nz;return t>=0&&t<=e.length&&Math.abs(d-.31)<.015;});const furniture=layout.items.some(i=>{if(!['partition','dividerWall','bench'].includes(i.kind))return false;const a=i.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),dx=stool.x-i.x,dz=stool.z-i.z,u=dx*c+dz*sn,v=-dx*sn+dz*c;return Math.abs(u)<=CATALOG[i.kind].w/2+.01&&Math.abs(Math.abs(v)-(CATALOG[i.kind].d/2+.31))<.015&&(i.kind!=='bench'||v>0);});assert(wall||furniture,'stool must be beside a wall, partition or bench back');}}
  const screen=layout.items.find(i=>i.id==='wc-screen');if(screen&&layout.items.some(i=>['chair','bench'].includes(i.kind)&&screenBlocksView(screen,i,nav.restroom.door)))screenUseful++;
  if(layout.items.some(i=>i.id==='checkout-screen'))assert(checkoutNeedsScreen(checkout,layout.items.filter(i=>i.id!=='checkout-screen'),outline));
  const cloth=fabricPanelSites(layout.items,outline,doors);assert(cloth.length<=3);if(cloth.length)panels++;

@@ -31,10 +31,8 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  function rod(a:T.Vector3,b:T.Vector3,r:number,m:T.Material,p:T.Object3D){const d=b.clone().sub(a);const o=cyl(r,r,d.length(),0,0,0,m,p);o.position.copy(a).add(b).multiplyScalar(.5);o.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());return o;}
  function tube(points:T.Vector3[],r:number,m:T.Material,p:T.Object3D){const mesh=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),32,r,8,false),m);mesh.castShadow=true;p.add(mesh);}
  function restroomIcons(c:CanvasRenderingContext2D,x:number,y:number,unit:number){
-  const person=(cx:number,dress:boolean)=>{c.beginPath();c.arc(cx,y,unit*.13,0,Math.PI*2);c.fill();c.fillRect(cx-unit*.065,y+unit*.17,unit*.13,unit*.32);
-   if(dress){c.beginPath();c.moveTo(cx,y+unit*.20);c.lineTo(cx-unit*.17,y+unit*.51);c.lineTo(cx+unit*.17,y+unit*.51);c.closePath();c.fill();}
-   c.fillRect(cx-unit*.12,y+unit*.20,unit*.24,unit*.055);c.fillRect(cx-unit*.095,y+unit*.49,unit*.065,unit*.28);c.fillRect(cx+unit*.03,y+unit*.49,unit*.065,unit*.28);
-  };person(x,false);person(x+unit*.56,true);
+  const person=(cx:number,color:string)=>{c.fillStyle=color;c.beginPath();c.arc(cx,y,unit*.105,0,Math.PI*2);c.fill();c.beginPath();c.moveTo(cx-unit*.14,y+unit*.18);c.lineTo(cx+unit*.14,y+unit*.18);c.lineTo(cx,y+unit*.60);c.closePath();c.fill();};
+  person(x,'#202522');person(x+unit*.56,'#c62d3b');
  }
  // One polygon drives the floor, ceiling, solid walls, windows and entry.
  const tileTex=texture(c=>{
@@ -146,23 +144,23 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
    const g=new T.Group();g.position.set(pick.e.a.x+pick.e.tx*pick.t,0,pick.e.a.z+pick.e.tz*pick.t);g.rotation.y=-pick.e.angle*Math.PI/180;scene.add(g);const panel=new T.Mesh(new T.PlaneGeometry(.58,.76),mat('#ffffff',.8,poster));panel.position.set(0,1.95,.103);g.add(panel);
  }
  // White 30cm fabric squares with one off-centre fruit or vegetable.
- const fabricTextures=Array.from({length:4},(_,kind)=>texture(c=>{c.fillStyle='#f7f5ec';c.fillRect(0,0,512,512);c.strokeStyle='#d8d5c916';c.lineWidth=1;for(let n=0;n<512;n+=8){c.beginPath();c.moveTo(n,0);c.lineTo(n,512);c.moveTo(0,n);c.lineTo(512,n);c.stroke();}
-  c.save();c.translate(225,268);c.rotate(-.18);c.fillStyle=['#bb3830','#e59038','#74476e','#dcbb44'][kind];c.beginPath();
+ const fabricTextures=Array.from({length:4},(_,kind)=>texture(c=>{c.fillStyle='#eee9dd';c.fillRect(0,0,512,512);c.strokeStyle='#aaa59530';c.lineWidth=1;for(let n=0;n<512;n+=5){c.beginPath();c.moveTo(n,0);c.lineTo(n,512);c.moveTo(0,n);c.lineTo(512,n);c.stroke();}
+  c.save();c.translate(kind%2?125:387,390);c.scale(.62,.62);c.rotate(kind%2?.15:-.18);c.fillStyle=['#bb3830','#e59038','#74476e','#dcbb44'][kind];c.beginPath();
   if(kind===1){c.moveTo(-65,-45);c.quadraticCurveTo(0,-65,60,-45);c.quadraticCurveTo(28,35,0,106);c.quadraticCurveTo(-38,35,-65,-45);}
   else{c.ellipse(0,0,kind===2?60:70,kind===2?88:62,0,0,Math.PI*2);}c.fill();
   c.strokeStyle='#42613b';c.lineWidth=10;c.beginPath();c.moveTo(0,-55);c.lineTo(5,-95);c.stroke();c.fillStyle='#547849';c.beginPath();c.ellipse(30,-86,30,12,-.4,0,Math.PI*2);c.fill();c.restore();}));
  const panelMat=fabricTextures.map(tex=>mat('#ffffff',.94,tex));
  let panelIndex=0;const doorsForDecor=[...kitchens,...(restroom?[restroom]:[])];
- for(const site of fabricPanelSites(items,outline,doorsForDecor)){const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.95,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);box(.30,.30,.015,0,0,.11,panelMat[panelIndex++%panelMat.length],g,.002);}
+ for(const site of fabricPanelSites(items,outline,doorsForDecor)){const g=new T.Group();g.position.set(site.e.a.x+site.e.tx*site.t,1.95,site.e.a.z+site.e.tz*site.t);g.rotation.y=-site.e.angle*Math.PI/180;scene.add(g);box(.30,.30,.035,0,0,.12,panelMat[panelIndex++%panelMat.length],g,.002);}
  // A mirrored column uses its undecorated fourth face; ordinary columns may use any clear face.
  let pillarPanels=0;for(const pillarItem of items.filter(i=>i.kind==='pillar')){if(pillarPanels>=2)break;
   for(const face of(pillarItem.mirror?[3]:[3,2,1,0])){const a=(pillarItem.rotation-face*90)*Math.PI/180,nx=-Math.sin(a),nz=Math.cos(a),x=pillarItem.x+nx*.47,z=pillarItem.z+nz*.47;
    const probe={x,z,w:.29,d:.12,rotation:(pillarItem.rotation-face*90+360)%360};if(!inside({x:x+nx*.15,z:z+nz*.15},outline)||items.some(i=>i.id!==pillarItem.id&&!isArt(i.kind)&&i.kind!=='robot'&&intersects(probe,bounds(i))))continue;
-   const g=new T.Group();g.position.set(x,1.98,z);g.rotation.y=-a;scene.add(g);box(.30,.30,.015,0,0,0,panelMat[panelIndex++%panelMat.length],g,.002);pillarPanels++;break;
+   const g=new T.Group();g.position.set(x,1.98,z);g.rotation.y=-a;scene.add(g);box(.30,.30,.035,0,0,0,panelMat[panelIndex++%panelMat.length],g,.002);pillarPanels++;break;
   }
  }
  // Suspended green restroom direction signs along the route from the entrance.
- if(restroom){const signTex=(direction:number)=>texture(c=>{c.fillStyle='#1d664b';c.fillRect(0,0,512,512);c.fillStyle='#f8f6e9';restroomIcons(c,135,130,250);c.beginPath();if(direction>0){c.moveTo(330,206);c.lineTo(405,206);c.lineTo(405,160);c.lineTo(475,255);c.lineTo(405,350);c.lineTo(405,304);c.lineTo(330,304);}else{c.moveTo(475,206);c.lineTo(400,206);c.lineTo(400,160);c.lineTo(330,255);c.lineTo(400,350);c.lineTo(400,304);c.lineTo(475,304);}c.closePath();c.fill();});
+ if(restroom){const signTex=(direction:number)=>texture(c=>{c.fillStyle='#1d664b';c.fillRect(0,0,512,512);c.fillStyle='#f8f6e9';restroomIcons(c,135,130,250);c.fillStyle='#f8f6e9';c.beginPath();if(direction>0){c.moveTo(330,206);c.lineTo(405,206);c.lineTo(405,160);c.lineTo(475,255);c.lineTo(405,350);c.lineTo(405,304);c.lineTo(330,304);}else{c.moveTo(475,206);c.lineTo(400,206);c.lineTo(400,160);c.lineTo(330,255);c.lineTo(400,350);c.lineTo(400,304);c.lineTo(475,304);}c.closePath();c.fill();});
   const forward=signTex(1),backward=signTex(-1),positions:Point[]=[],nav=createNavigator(items,outline,spawn,{services:false}),route=nav.aisleRoute(spawn,restroom.point);
   const candidates=[.42,.72,.20,.85].map(t=>{if(route.length){const index=Math.min(route.length-1,Math.floor((route.length-1)*t));return{point:route[index],next:route[Math.min(route.length-1,index+16)]};}return{point:{x:entry.x+(restroom.door.x-entry.x)*t,z:entry.z+(restroom.door.z-entry.z)*t},next:restroom.point};});
   candidates.push({point:spawn,next:route[Math.min(route.length-1,16)]??restroom.point});
@@ -188,7 +186,8 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  for(const b of items.filter(i=>i.kind==='bench')){
   const a=b.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
   const joined=items.some(q=>q.id!==b.id&&q.kind==='bench'&&q.rotation===b.rotation&&Math.abs(Math.abs((q.x-b.x)*c+(q.z-b.z)*sn)-1.84)<.08&&Math.abs(-(q.x-b.x)*sn+(q.z-b.z)*c)<.08);
-  if(!joined)continue;
+  const againstWall=edges(outline).some(e=>{const d=(b.x-e.a.x)*e.nx+(b.z-e.a.z)*e.nz,t=(b.x-e.a.x)*e.tx+(b.z-e.a.z)*e.tz;return Math.abs(e.nx-sn)<.05&&Math.abs(e.nz+c)<.05&&d>=.30&&d<.55&&t>=0&&t<=e.length;});
+  if(!joined||!againstWall)continue;
   const x=b.x+sn*.75,z=b.z-c*.75;if(!canWalk(x,z,[],outline,.3)||pendantSites.some(p=>Math.hypot(p.x-x,p.z-z)<1.2))continue;pendantSites.push({x,z});
   cyl(.012,.012,.74,x,2.91,z,metal);const shade=cyl(.085,.18,.25,x,2.43,z,new T.MeshStandardMaterial({color:'#fff8e4',emissive:'#ffe9c5',emissiveIntensity:.5}));shade.castShadow=false;
  }
@@ -419,7 +418,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
  }
  const benchRuns=continuousBenches(items),benchRunById=new Map<string,Item[]>();
  for(const run of benchRuns)if(run.length>1)for(const member of run)benchRunById.set(member.id,run);
- for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'stool':g.userData.seat='chair';cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.40,.045,x*.15,.22,z*.15,wood,g,.01);leg.rotation.z=x*-.08;}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':{const run=benchRunById.get(item.id);if(!run){bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;}if(run[0].id!==item.id)break;
+ for(const item of items){activeTableId=item.id;const g=new T.Group();g.position.set(item.x,0,item.z);g.rotation.y=-item.rotation*Math.PI/180;scene.add(g);if(isArt(item.kind)){artwork(item,g);continue;}switch(item.kind){case 'stool':g.userData.seat='chair';cyl(.20,.20,.028,0,.445,0,top,g);for(const x of[-1,1])for(const z of[-1,1]){const leg=box(.032,.43,.045,x*.15,.23,z*.15,wood,g,.01);leg.rotation.z=x*-.08;box(.055,.025,.055,x*.135,.426,z*.15,wood,g,.008);}break;case 'robot':robotMeshes.set(item.id,g);servi(g);break;case 'two':table(0,0,.82,.78,g);chair(0,.72,0,g);chair(0,-.72,Math.PI,g);break;case 'four':table(0,0,1.53,.8,g);bench(0,-.78,Math.PI,g);bench(0,.78,0,g);break;case 'table':table(0,0,.82,.78,g);break;case 'wideTable':table(0,0,1.53,.8,g);break;case 'chair':chair(0,0,0,g);break;case 'bench':{const run=benchRunById.get(item.id);if(!run){bench(0,0,0,g,benchRearHandrail(item,items,outline),item.screen===true);break;}if(run[0].id!==item.id)break;
  const first=run[0],last=run[run.length-1],a=item.rotation*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),length=1.84+(last.x-first.x)*c+(last.z-first.z)*sn;
  const sofa=bench((length-1.84)/2,0,0,g,false,false,length);
  for(const member of run)if(benchRearHandrail(member,items,outline)){const rail=new T.Group();rail.position.x=(member.x-first.x)*c+(member.z-first.z)*sn-(length-1.84)/2;sofa.add(rail);if(member.screen)privacyScreen(rail,1.84,.30,1.17);else handrail(rail,1.84,.30,1.26);}

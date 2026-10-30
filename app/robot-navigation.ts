@@ -22,7 +22,7 @@ export function createNavigator(items:Item[],outline:Point[],home:Point,options:
  for(const e of edges(outline)){if(e.i===entry.i||e.length<1.5)continue;for(let t=.75;t<=e.length-.75;t+=.25){const door={x:e.a.x+t*e.tx,z:e.a.z+t*e.tz},p={x:door.x+e.nx*.75,z:door.z+e.nz*.75};if(!fixtureWalk(p.x,p.z)||items.some(i=>i.kind==='checkout'&&Math.hypot(i.x-door.x,i.z-door.z)<1.1))continue;candidates.push({edge:e.i,point:p,door,width:1.1+(e.i%3)*.12,depth:1.2+(e.i%3)*.4,outside:{x:door.x-e.nx*.85,z:door.z-e.nz*.85},nx:e.nx,nz:e.nz,score:Math.hypot(door.x-entry.x,door.z-entry.z)});}}
 
  const checkout=items.find(i=>i.kind==='checkout');candidates.sort((a,b)=>checkout?Math.hypot(a.door.x-checkout.x,a.door.z-checkout.z)-Math.hypot(b.door.x-checkout.x,b.door.z-checkout.z):b.score-a.score);
- const kitchens:typeof candidates=[];for(const c of candidates){if(kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<5))continue;kitchens.push(c);if(kitchens.length>=(outline.length>4?2:1))break;}
+ const kitchens:typeof candidates=[];for(const c of candidates){if(kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<5))continue;kitchens.push(c);if(kitchens.length>=1)break;} // One coherent kitchen until a shared kitchen footprint is modeled.
  const kitchen=kitchens[0]??null;
  const restroom=candidates.find(c=>!kitchens.some(k=>k.edge===c.edge||Math.hypot(k.door.x-c.door.x,k.door.z-c.door.z)<4))??null;
  // Major aisles should travel through usable interior space, rather than
@@ -63,3 +63,5 @@ export function createNavigator(items:Item[],outline:Point[],home:Point,options:
  if(parents.has(id(target))&&Math.hypot(target.x-end.x,target.z-end.z)>.00001&&swept(end,target)&&blocked.every(o=>[.25,.5,.75,1].every(t=>Math.hypot(end.x+(target.x-end.x)*t-o.x,end.z+(target.z-end.z)*t-o.z)>=.6)))path.push({...target});
  return smooth(start,path,blocked);},yieldRoute(start:Point,blocked:Point[],avoid:Point[]){const{parents,first}=search(start,blocked);const target=[...parents.keys()].map(key=>({key,p:valid.get(key)!})).filter(({p})=>Math.hypot(p.x-start.x,p.z-start.z)>.8&&blocked.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>1)&&avoid.every(o=>Math.hypot(p.x-o.x,p.z-o.z)>.85)).sort((a,b)=>Math.hypot(a.p.x-start.x,a.p.z-start.z)-Math.hypot(b.p.x-start.x,b.p.z-start.z))[0];return target?smooth(start,trace(start,target.key,parents,first),blocked):[];},canMove:(p:Point)=>walk(p.x,p.z)};
 }
+
+

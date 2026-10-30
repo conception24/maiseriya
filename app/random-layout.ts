@@ -50,9 +50,6 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
  }
  // A sight screen faces the WC opening; guests can enter around either end.
  const wc=initialDoors.restroom;
- if(wc){const wall=edges(outline)[wc.edge],screen:Item={id:'wc-screen',kind:'partition',x:wc.door.x+wc.nx*2.65,z:wc.door.z+wc.nz*2.65,rotation:(Math.round(wall.angle/90)*90+360)%360};
-  if(!placementError(screen,items,outline)&&!reserved.some(r=>intersects(bounds(screen),r))){items.push(screen);serial++;}
- }
  // A compact staff-only hand basin on the wall beside the primary kitchen.
  // Keep the kitchen portal and the entrance-connected path open.
  const k=initialDoors.kitchens[0];
@@ -107,4 +104,3 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
 }
 
 export {customerSeatAccess} from './seating-rules';
-

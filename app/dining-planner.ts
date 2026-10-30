@@ -10,7 +10,7 @@ type Zone={items:Item[];aisles:Rect[];score:number};
 type Nav=ReturnType<typeof createNavigator>;
 const turn=(angle:number)=>(angle+360)%360;
 const structuralPitch=4.52; // .82m column + two 1.84m bench/wall bays + 2cm joint.
-const mainWidth=1.65,guestWidth=1.15;
+const mainWidth=1.45,guestWidth=1.0;
 export class LayoutPlanningError extends Error {}
 export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],random:()=>number,attempt=0){
  const entry=entrance(outline),wallEdges=edges(outline),xs=outline.map(p=>p.x),zs=outline.map(p=>p.z);
@@ -34,6 +34,14 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const ids=new Set(items.map(i=>i.id));
  function fits(zone:Zone){
   if(items.length+zone.items.length>138||zone.items.some(i=>ids.has(i.id)))return false;
+  const stranded=zone.items.filter(i=>i.kind==='bench').some(i=>wallEdges.some(e=>{
+    const b=bounds(i),r=i.rotation*Math.PI/180;
+    const along=Math.abs(Math.cos(r)*e.tx+Math.sin(r)*e.tz)*b.w/2+Math.abs(-Math.sin(r)*e.tx+Math.cos(r)*e.tz)*b.d/2;
+    const normal=Math.abs(Math.cos(r)*e.nx+Math.sin(r)*e.nz)*b.w/2+Math.abs(-Math.sin(r)*e.nx+Math.cos(r)*e.nz)*b.d/2;
+    const t=(i.x-e.a.x)*e.tx+(i.z-e.a.z)*e.tz,gap=(i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz-normal;
+    return t+along>0&&t-along<e.length&&gap>.15&&gap<1.2;
+   }));
+  if(stranded)return false;
   const proposed=zone.items.map(bounds);
   // Reject occupied sites before the more expensive concave-room containment test.
   // Zones contain ordinary furniture only; the entry exclusion is already in hard.
@@ -59,7 +67,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  // Favor architectural cores which leave room for a full window-side row.
  const windowOptions:Rect[]=[];
  for(const e of windowWalls)for(let t=2.05;t<=e.length-2.05;t+=1){const r={x:e.a.x+e.tx*t+e.nx*1.65,z:e.a.z+e.tz*t+e.nz*1.65,w:3.9,d:3.05,rotation:e.angle};if(rectInRoom(r,outline,.08)&&![...occupied,...hard].some(b=>intersects(r,b)))windowOptions.push(r);}
- const keepsWindow=(zone:Zone)=>windowOptions.some(r=>![...zone.items.map(bounds),...zone.aisles].some(b=>intersects(r,b)));
+ const windowCapacity=(zone:Zone)=>{const blocked=[...zone.items.map(bounds),...zone.aisles];return windowOptions.filter(r=>!blocked.some(b=>intersects(r,b))).length;};
  function spine(x:number,z:number,rotation:number,count:number,sides:number[],tableCount:number):Zone{
   const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0},half=(count-1)*structuralPitch/2;
   for(let n=0;n<count;n++){const column=f.item('pillar',-half+n*structuralPitch,0);column.mirror=n===0;zone.items.push(column);}
@@ -87,7 +95,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    for(const sides of[[1,-1],[preferSide],[-preferSide]]){
     const zone=spine(x,z,rotation,count,sides,random()<.5?3:4);if(!fits(zone))continue;
     const centreDistance=Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2);
-    zone.score=(count-1)*sides.length*6-centreDistance*.6+(rotation===preferRotation?.4:0)+(keepsWindow(zone)?24:0)+random()*.8;
+    zone.score=(count-1)*sides.length*6-centreDistance*.6+(rotation===preferRotation?.4:0)+windowCapacity(zone)*3+random()*.8;
     cores.push(zone);
    }
   }
@@ -106,7 +114,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    const q=f.rect(u,v,1,1),run=banquetteRun('banquette-elbow-'+serial++,q.x,q.z,turn(rotation+r),[4],random()<.5);zone.items.push(...run.items);
   }
   zone.aisles.push(f.rect(0,-p-3,structuralPitch+.82,mainWidth),{...f.rect(-p-3,0,structuralPitch+.82,mainWidth),rotation:turn(rotation+90)},f.rect(0,-p+3,3.68,guestWidth));
-  if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+(keepsWindow(zone)?24:0)+random();cores.push(zone);}
+  if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+windowCapacity(zone)*3+random();cores.push(zone);}
  }
  cores.sort((a,b)=>b.score-a.score);
  let corePlaced=false;
@@ -138,15 +146,21 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const usableWalls=wallEdges.filter(e=>Math.abs(e.angle%90)<.01&&e.length>2.5);
  // Match the walls that are actually rendered as windows, excluding service doors.
  // Reserve complete, wall-backed bench rows before optional central bays and booth rows.
- for(const e of windowWalls.sort((a,b)=>b.length-a.length)){
-  const candidates:Zone[]=[];
-  for(const count of[4,3]){const length=3.68;if(e.length<length+.2)continue;
-   for(let t=length/2+.1;t<=e.length-length/2-.09;t+=.5){
-    const run=banquetteRun('banquette-window-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),[count],count===4&&random()<.5);
-    const zone={items:run.items,aisles:run.aisles,score:count*.2-Math.min(t,e.length-t)*.015+random()*.05};if(fits(zone))candidates.push(zone);
+ const benchWalls=new Set<number>();
+ // Fill the longest feasible continuous wall run first. Tables may be separate,
+ // but the backing sofa remains continuous; booths never interrupt this wall.
+ for(const e of [...usableWalls].sort((a,b)=>Number(windowWalls.includes(b))-Number(windowWalls.includes(a))||b.length-a.length)){
+  for(const groups of [[4,4,4],[4,4],[3,4],[2,2],[4],[3]]){
+   const length=banquetteRun('measure',0,0,0,groups).length;if(e.length<length+.2)continue;
+   const positions=[length/2+.1,e.length-length/2-.1];
+   for(let t=length/2+.1;t<=e.length-length/2-.09;t+=.4)positions.push(t);
+   for(const t of positions){
+    const run=banquetteRun('banquette-window-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),groups,random()<.5);
+    // Wall approaches stop at row ends; actual end access is checked in commit().
+    const approaches=run.aisles.map((a,n)=>n===run.aisles.length-1?{...a,w:run.length}:a);
+    if(commit({items:run.items,aisles:approaches,score:0})){benchWalls.add(e.i);break;}
    }
   }
-  candidates.sort((a,b)=>b.score-a.score);for(const zone of candidates)commit(zone);
  }
  function placeSupplies(limit:number){
  const supplies:Zone[]=[];
@@ -183,40 +197,34 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const bankSites:{x:number;z:number;rotation:number}[]=[];
  for(let z=minZ+2;z<maxZ-2;z+=.6)for(let x=minX+2;x<maxX-2;x+=.6)
   for(const rotation of[coreAxis,90-coreAxis])bankSites.push({x,z,rotation});
- for(let pass=0;pass<Math.max(1,Math.ceil(area(outline)/110));pass++){
+ for(let pass=0;pass<Math.max(1,Math.min(6,Math.ceil(area(outline)/60)));pass++){
   const banks:Zone[]=[];
-  for(const {x,z,rotation} of bankSites)for(const sides of[[1,-1],[1],[-1]]){
+  for(const {x,z,rotation} of bankSites)for(const modules of[2,1])for(const sides of[[1,-1],[1],[-1]]){
    const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0};
-   for(const u of[-.92,.92])zone.items.push(f.item('dividerWall',u,0));
+   for(const u of(modules===2?[-.92,.92]:[0]))zone.items.push(f.item('dividerWall',u,0));
    for(const side of sides){
-    const q=f.rect(0,side*.412,1,1),run=banquetteRun('banquette-bay-'+serial++,q.x,q.z,turn(rotation+(side>0?180:0)),[4],random()<.5);zone.items.push(...run.items);
-    zone.aisles.push(f.rect(0,side*3,4.5,mainWidth));
+    const q=f.rect(0,side*.412,1,1),run=banquetteRun('banquette-bay-'+serial++,q.x,q.z,turn(rotation+(side>0?180:0)),[modules*2],random()<.5);zone.items.push(...run.items);
+    zone.aisles.push(f.rect(0,side*3,modules*1.84+.5,mainWidth));
    }
-   if(sides.length===1)zone.aisles.push(f.rect(0,-sides[0]*.75,4.5,guestWidth));
+   if(sides.length===1)zone.aisles.push(f.rect(0,-sides[0]*.75,modules*1.84+.5,guestWidth));
    if(!fits(zone))continue;
    const nearest=Math.min(...items.filter(i=>!isArt(i.kind)).map(i=>Math.hypot(i.x-x,i.z-z)));
-   zone.score=sides.length*3+Math.min(4,nearest)+(rotation===coreAxis?.8:0)+random()*.25;
+   zone.score=modules*sides.length*3+Math.min(4,nearest)+(rotation===coreAxis?.8:0)+random()*.25;
    banks.push(zone);
   }
   banks.sort((a,b)=>b.score-a.score);let placed=false;
   for(const zone of banks.slice(0,24))if(commit(zone)){placed=true;break;}
   if(!placed)break;
  }
- // Connect the structural aisles to entry and service zones before filling walls.
- const nav=navFor(items),home=spawnPoint(outline,items);
- const routes=[...destinations,...fronts,...aisles.map(r=>({x:r.x,z:r.z}))];
- for(const target of routes){const path=nav.aisleRoute(home,target);
-  for(let n=0;n<path.length;n+=5){const p=path[n],r={...p,w:1.2,d:1.2,rotation:0};
-   if(!items.some(i=>intersects(r,bounds(i))))aisles.push(r);
-  }
- }
+ // Every commit rechecks connected guest access. Do not freeze a temporary
+ // shortest path through a still-empty seating bay as an extra exclusion.
 
  // Rows are complete groups with one shared approach. Corners and fixtures define
  // their endpoints; there is no scatter-fill pass for isolated interior tables.
  const wallCandidates:Zone[]=[];
  const rowPreference=random()<.5?'four':'two';
- for(const e of usableWalls){
-  for(const kind of['four','two'] as const)for(const count of(kind==='four'?[4,3,2,1]:[3,2,1])){
+ for(const e of usableWalls.filter(e=>!benchWalls.has(e.i))){
+  for(const kind of['four','two'] as const)for(const count of(kind==='four'?[4,3,2]:[3,2])){
    const pitch=kind==='four'?2.222:2.65,length=(count-1)*pitch+CATALOG[kind].d;
    if(length>e.length-.2)continue;
    const positions=[length/2+.1,e.length-length/2-.1];
@@ -238,18 +246,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  for(const zone of wallCandidates.filter(z=>z.items[0].kind==='two'))if(commit(zone))break;
  for(const zone of wallCandidates)commit(zone);
 
- // Separate wings can use wall-backed long seating too.
- for(const e of usableWalls.sort((a,b)=>b.length-a.length)){
-  for(const groups of[[3,4],[4],[3]]){
-   const runLength=banquetteRun('measure',0,0,0,groups).length;
-   for(const t of[runLength/2+.1,e.length-runLength/2-.1]){
-    const run=banquetteRun('banquette-wall-'+serial++,e.a.x+e.tx*t+e.nx*.42,e.a.z+e.tz*t+e.nz*.42,turn(e.angle+180),groups,random()<.5);
-    if(commit({items:run.items,aisles:run.aisles,score:0}))break;
-   }
-  }
- }
  placeSupplies(2);
  return{items,aisles};
 }
-
 

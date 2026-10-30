@@ -55,6 +55,23 @@ export function screenBlocksView(screen:Item,from:Point,to:Point){
  const t=-az/(bz-az);return Math.abs(ax+(bx-ax)*t)<=.88;
 }
 
+// Use the actual opaque footprint: a column is not a 1.8m-wide screen, and
+// a seat cushion does not hide a doorway. Only bench backs obstruct seated views.
+export function furnishingBlocksView(item:Item,from:Point,to:Point){
+ const a=item.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ const ax=(from.x-item.x)*c+(from.z-item.z)*s,az=-(from.x-item.x)*s+(from.z-item.z)*c;
+ const bx=(to.x-item.x)*c+(to.z-item.z)*s,bz=-(to.x-item.x)*s+(to.z-item.z)*c;
+ const strips=item.kind==='bench'?[{w:1.82,d:.12,v:.27}]:item.kind==='four'?[-1,1].map(sign=>({w:1.82,d:.12,v:sign*1.04})):[{...CATALOG[item.kind],v:0}];
+ return strips.some(r=>{
+  let near=.001,far=.999;
+  for(const [p,delta,half] of [[ax,bx-ax,r.w/2],[az-r.v,bz-az,r.d/2]]){
+   if(Math.abs(delta)<1e-9){if(Math.abs(p)>half)return false;continue;}
+   const u=(-half-p)/delta,v=(half-p)/delta;near=Math.max(near,Math.min(u,v));far=Math.min(far,Math.max(u,v));if(near>far)return false;
+  }
+  return true;
+ });
+}
+
 // Choose a screen by how many actual seating viewpoints lose sight of the WC.
 export function chooseRestroomScreen(items:Item[],outline:Point[],wc:Portal,portals:Portal[],reserved:Rect[]):Item|null{
  const current=items.find(i=>i.id==='wc-screen'),base=items.filter(i=>i.id!=='wc-screen'),wall=edges(outline)[wc.edge];
@@ -65,14 +82,16 @@ export function chooseRestroomScreen(items:Item[],outline:Point[],wc:Portal,port
  const candidates:Item[]=[];if(current)candidates.push(current);
  for(const d of[2.5,2.8,3.1,3.4])for(const shift of[0,-.45,.45,-.9,.9])for(const turn of[0,90])candidates.push({id:'wc-screen',kind:'partition',x:wc.door.x+wc.nx*d+wall.tx*shift,z:wc.door.z+wc.nz*d+wall.tz*shift,rotation:(Math.round(wall.angle/90)*90+turn+360)%360});
  const targets=[-.28,0,.28].map(t=>({x:wc.door.x+wall.tx*wc.width*t,z:wc.door.z+wall.tz*wc.width*t}));
- const score=(i:Item)=>seats.reduce((n,p)=>n+targets.filter(t=>screenBlocksView(i,p,t)).length,0);
+ const occluders=base.filter(i=>['partition','dividerWall','pillar','four','bench'].includes(i.kind));
+ const visible=seats.filter(p=>Math.hypot(p.x-wc.door.x,p.z-wc.door.z)<8).flatMap(p=>targets.filter(t=>!occluders.some(i=>furnishingBlocksView(i,p,t))).map(t=>({p,t})));
+ if(!visible.length)return null;
+ const score=(i:Item)=>visible.filter(({p,t})=>screenBlocksView(i,p,t)).length;
  candidates.sort((x,y)=>score(y)-score(x));
- for(const screen of candidates){if(placementError(screen,base,outline)||reserved.some(r=>intersects(bounds(screen),r)))continue;
+ for(const screen of candidates){if(score(screen)<Math.max(2,visible.length*.35))continue;if(placementError(screen,base,outline)||reserved.some(r=>intersects(bounds(screen),r)))continue;
   const next=[...base,screen];if(chairClearance({items:next,outline,chairStyle:'gray'})<.999)continue;
   const nav=createNavigator(next,outline,spawnPoint(outline,next),{services:false});
   if(!portals.every(p=>nav.reachable(p.point,.35))||!next.filter(i=>i.kind==='two'||i.kind==='four').every(i=>customerSeatAccess(i,nav))||!smallTableGroups(next).every(group=>smallGroupAccess(group,nav)))continue;
   return screen;
  }
- return current??null;
+ return null;
 }
-

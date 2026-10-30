@@ -82,7 +82,7 @@ export default function HomePage(){
  function generate(room:boolean){if(generationWorker.current)return;setGenerating(true);setSelected(null);setTool(null);cancelPointer();
   try{const worker=new LayoutWorker();generationWorker.current=worker;
    const finish=()=>{worker.terminate();generationWorker.current=null;setGenerating(false);};
-   worker.onmessage=(event:MessageEvent<{layout?:Layout;error?:string}>)=>{try{if(event.data.error||!event.data.layout)throw Error();const next=event.data.layout;if(room){commitLayout(next);notify('部屋の形状を生成しました。「ランダム配置」で家具を配置できます');}else if(!next.items.some(i=>i.kind==='two'||i.kind==='four'))notify('配置できる広さがありません。部屋を広げてください');else {commitLayout(next);notify('連続ベンチ席と通路を確保した配置を生成しました');}}catch{notify(event.data.error??'配置を生成できませんでした');}finally{finish();}};
+   worker.onmessage=(event:MessageEvent<{layout?:Layout;error?:string}>)=>{try{if(event.data.error||!event.data.layout)throw Error();const next=event.data.layout;if(room){commitLayout(next);notify('部屋の形状を生成しました。「ランダム配置」で家具を配置できます');}else {commitLayout(next);notify('連続ベンチ席と通路を確保した配置を生成しました');}}catch{notify(event.data.error??'配置を生成できませんでした');}finally{finish();}};
    worker.onerror=()=>{notify('配置を生成できませんでした。もう一度お試しください');finish();};worker.postMessage({layout,room,preferences});
   }catch{setGenerating(false);generationWorker.current=null;notify('配置を生成できませんでした。ページを再読み込みしてください');}
  }

@@ -45,3 +45,11 @@ console.log('PASS: supply station and its customer approach survive dense wall r
 const blind={...base,items:[...[-.65,.65].flatMap((x,n)=>[-.9,.9].map((z,m)=>({id:`blind-${n}-${m}`,kind:'dividerWall',x,z,rotation:90}))),{id:'cap',kind:'dividerWall',x:0,z:-1.8,rotation:0}]};
 assert(quality(blind).deadEnds>quality({...base,items:[]}).deadEnds,'unused blind passages receive a penalty, not seating access ends');
 console.log('PASS: dead-end pocket ranking signal.');
+
+// The actual clearance of a corridor, including room walls, controls the excess score.
+for(const width of [1.2,1.5,2.1,3.6]){
+ const corridor={...base,items:[],outline:[{x:-width/2,z:-6},{x:width/2,z:-6},{x:width/2,z:6},{x:-width/2,z:6}]};
+ const result=quality(corridor);
+ if(width<=2.1)assert.equal(result.aisleExcess,0);else assert(result.aisleExcess>0);
+}
+console.log('PASS: 1.2–2.1m corridors are not penalized; unnecessarily wide corridors are.');

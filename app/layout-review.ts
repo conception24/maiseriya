@@ -7,7 +7,7 @@ import {diningCost,smallTableGroups,smallGroupAccess} from './seating-rules';
 import {customerSeatAccess,randomArrangement} from './random-layout';
 export type Preferences={density:number;order:number;coverage:number;wall:number;dividers:number};
 export const defaultPreferences:Preferences={density:1,order:1,coverage:1.15,wall:1.2,dividers:1.2};
-export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;dividers:number;banquette:number;emptyRadius:number;deadEnds?:number;comfort?:number;structure?:number;circulation?:number;waste?:number;usableEmptyRadius?:number;score:number};
+export type Assessment={seats:number;tables:number;blocked:number;density:number;order:number;coverage:number;wall:number;dividers:number;banquette:number;emptyRadius:number;deadEnds?:number;comfort?:number;structure?:number;circulation?:number;waste?:number;usableEmptyRadius?:number;aisleExcess?:number;score:number};
 export type Proposal={layout:Layout;assessment:Assessment};
 export const ISSUE_OPTIONS=[
  {id:'aisles-wide',label:'通路が広すぎる'}, {id:'aisles-narrow',label:'通路が狭すぎる'},
@@ -32,7 +32,7 @@ export function toggleAnswer(selected:AnswerSelection[],answer:AnswerSelection):
 }
 
 export function preferenceScore(a:Omit<Assessment,'score'>,weights:Preferences):number{
- return(a.density*weights.density+a.order*weights.order+a.coverage*weights.coverage+a.wall*weights.wall+a.dividers*weights.dividers)*20-Math.abs(a.density-.82)*45-a.blocked*1000+(a.banquette??0)*12-Math.max(0,(a.usableEmptyRadius??a.emptyRadius??0)-2.3)*40+(a.comfort??1)*24+(a.structure??0)*24+(a.circulation??1)*20-(a.waste??0)*weights.coverage*45-(a.deadEnds??0)*50;
+ return(a.density*weights.density+a.order*weights.order+a.coverage*weights.coverage+a.wall*weights.wall+a.dividers*weights.dividers)*20-Math.abs(a.density-.82)*45-a.blocked*1000+(a.banquette??0)*12-Math.max(0,(a.usableEmptyRadius??a.emptyRadius??0)-2.3)*40+(a.comfort??1)*24+(a.structure??0)*24+(a.circulation??1)*20-(a.waste??0)*weights.coverage*45-(a.deadEnds??0)*50-(a.aisleExcess??0)*80;
 }
 export function assess(layout:Layout,weights:Preferences=defaultPreferences):Assessment{
  const tables=layout.items.filter(i=>['two','four','table'].includes(i.kind)),walls=edges(layout.outline),nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items),{services:false});

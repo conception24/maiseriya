@@ -4,7 +4,8 @@ import {Furniture} from './furniture-glyph';
 import {entrance,spawnPoint,isArt,type Layout} from './floor-plan';
 import {createNavigator} from './robot-navigation';
 import {continuousBenches} from './seating-rules';
-import {PLANNER_VERSION,type LayoutPair,type PairAnswer} from './pair-review-model';
+import {feedbackDocument,type LayoutPair,type PairAnswer,type PairRoomMode} from './pair-review-model';
+import {PairPrefetch,type PairQueueStatus} from './pair-prefetch';
 import PairWorker from './pair-worker?worker&inline';
 
 function Plan({layout,label}:{layout:Layout;label:string}){
@@ -29,44 +30,54 @@ function PairWalk({layout}:{layout:Layout}){
 }
 export function PairReview({open,layout,onClose}:{open:boolean;layout:Layout;onClose:()=>void}){
  const [pair,setPair]=useState<LayoutPair|null>(null),[records,setRecords]=useState<PairAnswer[]>([]),[note,setNote]=useState('');
- const [ready,setReady]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[view,setView]=useState<'plan'|'A'|'B'>('plan');
- const lastAnswer=useRef(0);
- const session=useRef<{source:Layout;worker:Worker|null;next:LayoutPair|null;current:LayoutPair|null;answered:boolean;seed:number}|null>(null);
- const refill=()=>{
-  const s=session.current;if(!s||s.worker||s.next)return;
-  const worker=new PairWorker();s.worker=worker;setLoading(true);setError('');
-  const fail=(message:string)=>{worker.terminate();if(session.current!==s)return;s.worker=null;setLoading(false);setError(message);};
-  worker.onmessage=(event:MessageEvent<{pair?:LayoutPair;error?:string}>)=>{
-   worker.terminate();if(session.current!==s)return;s.worker=null;setLoading(false);
-   if(!event.data.pair){setError(event.data.error??'生成できませんでした');return;}
-   if(!s.current){s.current=event.data.pair;s.answered=false;setPair(s.current);setNote('');setView('plan');refill();}
-   else{s.next=event.data.pair;setReady(true);}
-  };
-  worker.onerror=()=>fail('生成を中断しました。再試行してください。');
-  worker.postMessage({layout:s.source,seed:s.seed});s.seed=(s.seed+1000003)%2147483646;
+ const [mode,setMode]=useState<PairRoomMode>('varied'),[waiting,setWaiting]=useState(true),[error,setError]=useState('');
+ const [status,setStatus]=useState<PairQueueStatus>({ready:0,loading:false,error:''}),[view,setView]=useState<'plan'|'A'|'B'>('plan');
+ const [saved,setSaved]=useState(0);
+ const session=useRef<{queue:PairPrefetch;current:LayoutPair|null}|null>(null);
+ const advance=async(s:NonNullable<typeof session.current>)=>{
+  setWaiting(true);setError('');
+  try{const next=await s.queue.take();if(session.current!==s)return;s.current=next;setPair(next);setNote('');setView('plan');}
+  catch(error){if(session.current===s)setError(error instanceof Error?error.message:'次の問題を用意できませんでした。');}
+  finally{if(session.current===s)setWaiting(false);}
  };
  useEffect(()=>{
   if(!open)return;
-  const s={source:structuredClone(layout),worker:null,next:null,current:null,answered:false,seed:Math.floor(Math.random()*2147483645)+1};
-  session.current=s;setPair(null);setReady(false);setNote('');setView('plan');refill();
-  return()=>{session.current?.worker?.terminate();session.current=null;};
-  // The chosen room is frozen for this comparison session, including during prefetch.
- },[open]);
- const answer=(choice:PairAnswer['choice'])=>{
-  const s=session.current;if(!s?.current||s.answered||performance.now()-lastAnswer.current<400)return;s.answered=true;lastAnswer.current=performance.now();
+  const source=structuredClone(layout);let seed=Math.floor(Math.random()*2147483645)+1;
+  const queue=new PairPrefetch(()=>{
+   const worker=new PairWorker();let rejectRequest:(error:Error)=>void=()=>{},timeout:ReturnType<typeof setTimeout>;
+   const stop=()=>{clearTimeout(timeout);worker.terminate();};
+   const promise=new Promise<LayoutPair>((resolve,reject)=>{
+    rejectRequest=reject;
+    timeout=setTimeout(()=>{stop();reject(Error('生成に時間がかかっています。別の候補を試します。'));},30000);
+    worker.onmessage=(event:MessageEvent<{pair?:LayoutPair;error?:string}>)=>{stop();if(event.data.pair)resolve(event.data.pair);else reject(Error(event.data.error??'２案を作れませんでした。'));};
+    worker.onerror=()=>{stop();reject(Error('生成を中断しました。'));};
+    try{worker.postMessage({layout:source,seed,mode});seed=(seed+1000003)%2147483646+1;}catch(error){stop();reject(error);}
+   });
+   return{promise,cancel:()=>{stop();rejectRequest(Error('比較を終了しました'));}};
+  },setStatus);
+  const s={queue,current:null};session.current=s;setPair(null);setNote('');setView('plan');void advance(s);
+  return()=>{queue.dispose();if(session.current===s)session.current=null;};
+  // Keep the source frozen until the dialog or room mode changes.
+ },[open,mode]);
+ const answer=(choice:PairAnswer['choice'],id:string)=>{
+  const s=session.current;if(!s?.current||s.current.id!==id)return;
   const record:PairAnswer={pair:s.current,choice,note:note.trim(),view,at:new Date().toISOString()};
-  setRecords(r=>[...r,record]);s.current=s.next;s.next=null;s.answered=false;setPair(s.current);setReady(false);setNote('');setView('plan');refill();
+  s.current=null;setRecords(r=>[...r,record]);void advance(s);
  };
- const save=()=>{const blob=new Blob([JSON.stringify({format:'saize-pair-feedback',version:1,plannerVersion:PLANNER_VERSION,records},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='saize-ab-feedback.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
- return <Dialog open={open} onOpenChange={v=>{if(!v)onClose();}}><DialogContent className="layout-comparison pair-review"><DialogTitle>どちらの配置が自然ですか？</DialogTitle><DialogDescription>同じ部屋の２案です。A・B・どちらもダメを選ぶと、すぐ次へ進みます。理由は任意です。</DialogDescription>
-  <p role="status">{records.length}問回答済み ／ {ready?'次の２案を準備済み':loading?'次の２案を先に生成中…':'生成待ち'}</p>
+ const save=()=>{const blob=new Blob([JSON.stringify(feedbackDocument(records),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='saize-ab-feedback.json';a.click();setSaved(records.length);setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ return <Dialog open={open} onOpenChange={v=>{if(!v)onClose();}}><DialogContent className="layout-comparison pair-review"><DialogTitle>どちらの配置が自然ですか？</DialogTitle><DialogDescription>回答をクリックするだけで次の問題へ。ダウンロードは最後に全回答をまとめて１回でできます。</DialogDescription>
+  <label className="pair-room-mode">部屋の形<select value={mode} onChange={e=>setMode(e.target.value as PairRoomMode)}><option value="varied">問題ごとに自動で変える</option><option value="fixed">現在の部屋の形で続ける</option></select></label>
+  <p role="status">第{records.length+1}問 · {records.length}問回答済み ／ 次の問題：{status.ready}問準備済み{status.loading?'・先読み中…':''}。１問のA・Bは同じ部屋です。</p>
+  <div className="pair-stage" aria-busy={waiting}>
   {pair?<><div className="pair-view-buttons"><button aria-pressed={view==='plan'} onClick={()=>setView('plan')}>平面図で比較</button><button aria-pressed={view==='A'} onClick={()=>setView('A')}>Aを3Dで見る</button><button aria-pressed={view==='B'} onClick={()=>setView('B')}>Bを3Dで見る</button></div>
    {view==='plan'?<div className="comparison-plans">{pair.candidates.map((p,n)=><section key={n}><h3>{n===0?'A':'B'} <small>{p.assessment.seats}席・{p.assessment.tables}卓</small></h3><Plan layout={p.layout} label={n===0?'A':'B'}/></section>)}</div>:<PairWalk key={pair.id+view} layout={pair.candidates[view==='A'?0:1].layout}/>}
-   <label>理由・気になる場所（任意）<input maxLength={2000} value={note} onChange={e=>setNote(e.target.value)} placeholder="例：Aは長椅子が続いている。Bは右下が空きすぎ"/></label>
-   <div className="comparison-actions pair-vote"><button onClick={()=>answer('A')}>Aの方がよい</button><button onClick={()=>answer('B')}>Bの方がよい</button><button onClick={()=>answer('neither')}>どちらもダメ</button></div>
-  </>:<p role="status">{error?'２案を用意できませんでした。':'比較する２案を生成しています…'} 回答済みの結果は保持しています。</p>}
-  {error&&<p role="alert">{error} <button onClick={refill}>再試行</button></p>}
-  <div className="comparison-actions"><button disabled={!records.length} onClick={save}>評価結果を保存（{records.length}問）</button><button onClick={onClose}>閉じる</button></div>
-  <p>回答・両方の配置・乱数・生成時間を記録します。保存したファイルを共有すると、配置ルールの改善に使えます。自動学習や自動送信はしません。ページを閉じる前に保存してください。</p>
+  </>:<div className="pair-empty">比較する２案を生成しています…</div>}
+  {waiting&&<div className="pair-loading" role="status">{records.length?'回答を記録しました。':''}次の２案を準備中…</div>}
+  </div>
+  <label>理由・気になる場所（任意）<input disabled={waiting||!pair} maxLength={2000} value={note} onChange={e=>setNote(e.target.value)} placeholder="例：Aは長椅子が続いている。Bは右下が空きすぎ"/></label>
+  <div className="comparison-actions pair-vote"><button disabled={waiting||!session.current?.current} onClick={()=>pair&&answer('A',pair.id)}>Aの方がよい → 次へ</button><button disabled={waiting||!session.current?.current} onClick={()=>pair&&answer('B',pair.id)}>Bの方がよい → 次へ</button><button disabled={waiting||!session.current?.current} onClick={()=>pair&&answer('neither',pair.id)}>どちらもダメ → 次へ</button></div>
+  {error&&<p role="alert">次の問題を準備できませんでした。回答済みの結果は保持しています。<button disabled={waiting} onClick={()=>session.current&&void advance(session.current)}>ここで再試行</button></p>}
+  <div className="comparison-actions"><button disabled={!records.length} onClick={save}>全{records.length}問をまとめてダウンロード</button><button onClick={onClose}>いったん閉じる</button></div>
+  <p>{records.length>saved?`未ダウンロード：${records.length-saved}問。`:''}閉じてもこのページ内の回答は残ります。ページを閉じる・再読み込みする前にまとめてダウンロードしてください。自動送信・自動学習はしません。</p>
  </DialogContent></Dialog>;
 }

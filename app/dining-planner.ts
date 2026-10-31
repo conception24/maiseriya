@@ -75,6 +75,39 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  const windowOptions:Rect[]=[];
  for(const e of windowWalls)for(let t=2.05;t<=e.length-2.05;t+=1){const r={x:e.a.x+e.tx*t+e.nx*1.65,z:e.a.z+e.tz*t+e.nz*1.65,w:3.9,d:3.05,rotation:e.angle};if(rectInRoom(r,outline,.08)&&![...occupied,...hard].some(b=>intersects(r,b)))windowOptions.push(r);}
  const windowCapacity=(zone:Zone)=>{const blocked=[...zone.items.map(bounds),...zone.aisles];return windowOptions.filter(r=>!blocked.some(b=>intersects(r,b))).length;};
+ const usableWalls=wallEdges.filter(e=>Math.abs(e.angle%90)<.01&&e.length>2.5);
+ const boothWalls=new Set<number>();
+ // A booth row is one wall-attached zone: both sofas per table, consecutive
+ // sofa backs touching, and a shared 1.2m approach along the open table ends.
+ function boothRows(){
+  const candidates:(Zone&{edge:number})[]=[];
+  for(const e of usableWalls)for(const count of[4,3,2]){
+   const pitch=CATALOG.four.d+.002,length=(count-1)*pitch+CATALOG.four.d;
+   if(length>e.length-.2)continue;
+   const positions=[length/2+.1,e.length-length/2-.1];
+   for(let t=length/2+.1;t<=e.length-length/2-.09;t+=.5)positions.push(t);
+   for(const t of [...new Set(positions)]){
+    const offset=CATALOG.four.w/2+.1,rotation=turn(e.angle+90);
+    const zone:Zone&{edge:number}={edge:e.i,items:[],aisles:[],score:0};
+    for(let n=0;n<count;n++){
+     const u=t+(n-(count-1)/2)*pitch;
+     zone.items.push({id:'booth-row-'+serial++,kind:'four',x:e.a.x+e.tx*u+e.nx*offset,z:e.a.z+e.tz*u+e.nz*offset,rotation});
+    }
+    zone.aisles.push({x:e.a.x+e.tx*t+e.nx*(CATALOG.four.w+.1+guestWidth/2),z:e.a.z+e.tz*t+e.nz*(CATALOG.four.w+.1+guestWidth/2),w:length,d:guestWidth,rotation:e.angle});
+    // Keep window walls for continuous benches wherever a solid wall is usable.
+    zone.score=count*4+(windowWalls.includes(e)?0:20)+2/(.3+Math.min(t-length/2,e.length-t-length/2));
+    if(fits(zone))candidates.push(zone);
+   }
+  }
+  return candidates.sort((a,b)=>b.score-a.score);
+ }
+ const initialBooths=boothRows().filter(z=>z.items.length===2);
+ // The structural core must leave at least one complete booth row possible.
+ // This is a capacity check, not a late attempt to scatter individual tables.
+ const boothCapacity=(zone:Zone)=>{
+  const blocked=[...zone.items.map(bounds),...zone.aisles];
+  return initialBooths.some(row=>[...row.items.map(bounds),...row.aisles].every(b=>!blocked.some(r=>intersects(b,r,-.001))));
+ };
  function spine(x:number,z:number,rotation:number,count:number,sides:number[],tableCount:number):Zone{
   const f=local(x,z,rotation),zone:Zone={items:[],aisles:[],score:0},half=(count-1)*structuralPitch/2;
   for(let n=0;n<count;n++){const column=f.item('pillar',-half+n*structuralPitch,0);column.mirror=n===0;zone.items.push(column);}
@@ -101,6 +134,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    if([-half,half].some(u=>clearance({x:x+Math.cos(rad)*u,z:z+Math.sin(rad)*u})<1.8))continue;
    for(const sides of[[1,-1],[preferSide],[-preferSide]]){
     const zone=spine(x,z,rotation,count,sides,random()<.5?3:4);if(!fits(zone))continue;
+    if(initialBooths.length&&!boothCapacity(zone))continue;
     const centreDistance=Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2);
     zone.score=(count-1)*sides.length*6-centreDistance*.6+(rotation===preferRotation?.4:0)+windowCapacity(zone)*3+random()*.8;
     cores.push(zone);
@@ -121,7 +155,7 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
    const q=f.rect(u,v,1,1),run=banquetteRun('banquette-elbow-'+serial++,q.x,q.z,turn(rotation+r),[4],random()<.5);zone.items.push(...run.items);
   }
   zone.aisles.push(f.rect(0,-p-3,structuralPitch+.82,mainWidth),{...f.rect(-p-3,0,structuralPitch+.82,mainWidth),rotation:turn(rotation+90)},f.rect(0,-p+3,3.68,guestWidth));
-  if(fits(zone)){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+windowCapacity(zone)*3+random();cores.push(zone);}
+  if(fits(zone)&&(!initialBooths.length||boothCapacity(zone))){zone.score=(preferElbow?32:16)-Math.hypot(x-(minX+maxX)/2,z-(minZ+maxZ)/2)*.3+windowCapacity(zone)*3+random();cores.push(zone);}
  }
  cores.sort((a,b)=>b.score-a.score);
  let corePlaced=false;
@@ -150,13 +184,14 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  if(!corePlaced)throw new LayoutPlanningError('柱・連続ベンチ席・通路を一緒に確保できません。部屋の形状を広げてください。');
 
 
- const usableWalls=wallEdges.filter(e=>Math.abs(e.angle%90)<.01&&e.length>2.5);
+ // Reserve a connected booth row before benches consume every usable wall.
+ for(const row of boothRows())if(commit(row)){boothWalls.add(row.edge);break;}
  // Match the walls that are actually rendered as windows, excluding service doors.
  // Reserve complete, wall-backed bench rows before optional central bays and booth rows.
  const benchWalls=new Set<number>();
  // Fill the longest feasible continuous wall run first. Tables may be separate,
  // but the backing sofa remains continuous; booths never interrupt this wall.
- for(const e of [...usableWalls].sort((a,b)=>Number(windowWalls.includes(b))-Number(windowWalls.includes(a))||b.length-a.length)){
+ for(const e of usableWalls.filter(e=>!boothWalls.has(e.i)).sort((a,b)=>Number(windowWalls.includes(b))-Number(windowWalls.includes(a))||b.length-a.length)){
   for(const groups of [[4,4,4],[4,4],[3,4],[2,2],[4],[3]]){
    const length=banquetteRun('measure',0,0,0,groups).length;if(e.length<length+.2)continue;
    const positions=[length/2+.1,e.length-length/2-.1];

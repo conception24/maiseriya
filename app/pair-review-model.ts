@@ -3,7 +3,7 @@ import {randomArrangement,randomRoom} from './random-layout';
 import {assess,type Proposal} from './layout-review';
 import {isArt,type Layout} from './floor-plan';
 
-export const PLANNER_VERSION='2026-10-30-lobby-clearance-v3';
+export const PLANNER_VERSION='2026-10-31-booth-rows-v4';
 export type PairCandidate=Proposal&{seed:number;generationMs:number};
 export type LayoutPair={id:string;version:string;candidates:[PairCandidate,PairCandidate]};
 export type PairAnswer={pair:LayoutPair;choice:'A'|'B'|'neither';note:string;at:string;view:'plan'|'A'|'B'};

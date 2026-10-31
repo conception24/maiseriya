@@ -1,10 +1,26 @@
 import assert from 'node:assert/strict';
-import {initialLayout,parseDocument,spawnPoint,edges} from '../work/model-test/floor-plan.mjs';
+import {initialLayout,parseDocument,spawnPoint,edges,CATALOG} from '../work/model-test/floor-plan.mjs';
 import {generatePair,layoutFingerprint,seededRandom,PLANNER_VERSION,generateReviewPair,feedbackDocument} from '../work/model-test/pair-review-model.mjs';
 import {randomArrangement} from '../work/model-test/random-layout.mjs';
 import {createNavigator} from '../work/model-test/robot-navigation.mjs';
 import {furnishingBlocksView,chooseRestroomScreen} from '../work/model-test/service-layout.mjs';
 const source=initialLayout(),snapshot=JSON.stringify(source),pair=generatePair(source,21);
+function checkBoothRow(layout){
+ const booths=layout.items.filter(i=>i.kind==='four');
+ assert(booths.length>=2,'include sofas on both sides in at least two booths');
+ const connected=booths.some(a=>booths.some(b=>{
+  if(a===b||a.rotation!==b.rotation)return false;
+  const r=a.rotation*Math.PI/180,dx=b.x-a.x,dz=b.z-a.z;
+  return Math.abs(dx*Math.cos(r)+dz*Math.sin(r))<.01&&Math.abs(Math.abs(-dx*Math.sin(r)+dz*Math.cos(r))-CATALOG.four.d)<.01;
+ }));
+ assert(connected,'neighboring booths meet at their sofa backs, not their table ends');
+ assert(booths.some(i=>edges(layout.outline).some(e=>{
+  const t=(i.x-e.a.x)*e.tx+(i.z-e.a.z)*e.tz;
+  const d=(i.x-e.a.x)*e.nx+(i.z-e.a.z)*e.nz;
+  return t>0&&t<e.length&&Math.abs(d-(CATALOG.four.w/2+.1))<.01;
+ })),'booth row is attached to a room wall');
+ assert(layout.items.some(i=>i.kind==='bench'),'retain continuous bench seating');
+}
 assert.equal(JSON.stringify(source),snapshot);
 assert.equal(pair.version,PLANNER_VERSION);
 assert.equal(pair.candidates.length,2);
@@ -13,6 +29,7 @@ for(const candidate of pair.candidates){
  const {layout,seed,assessment}=candidate;
  assert.deepEqual(layout.outline,source.outline);
  assert.equal(assessment.blocked,0);assert.equal(assessment.comfort,1);
+ checkBoothRow(layout);
  parseDocument({version:2,...layout});
  assert.deepEqual(randomArrangement(source,seededRandom(seed)),layout,'exported seed replays exact candidate');
  const nav=createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items),{services:false});
@@ -37,18 +54,19 @@ const nav=createNavigator([],source.outline,spawnPoint(source.outline,[]),{servi
 assert.equal(chooseRestroomScreen([],source.outline,nav.restroom,[...nav.kitchens,nav.restroom],[]),null,'no seats means no privacy screen needed');
 console.log('PASS: distinct comparable plans, exact replay, no source mutation, usable seats, continuous wall benches, single kitchen and physical WC occluders.');
 
-// Ordinary bench-only layouts are successful results, not "room too small".
+// This concave room previously returned only benches. It must remain usable
+// while providing a connected booth row too.
 const benchRoom={...source,outline:[{x:7,z:9},{x:-7,z:9},{x:-7,z:-2},{x:-4,z:-2},{x:-4,z:-9},{x:7,z:-9}]};
 const {proposals}=await import('../work/model-test/layout-review.mjs');
 const benchProposal=proposals(benchRoom,undefined,seededRandom(21))[0];
 assert(benchProposal.assessment.tables>0);assert.equal(benchProposal.assessment.blocked,0);
-assert(!benchProposal.layout.items.some(i=>['two','four'].includes(i.kind)));
+checkBoothRow(benchProposal.layout);
 const roomShapes=new Set(),times=[];
 for(const seed of [21,1000025,2000029,3000033]){
  const start=performance.now(),p=generateReviewPair(source,seed,'varied');times.push(Math.round(performance.now()-start));
  assert.deepEqual(p.candidates[0].layout.outline,p.candidates[1].layout.outline);
  roomShapes.add(JSON.stringify(p.candidates[0].layout.outline));
- for(const c of p.candidates)assert.equal(c.assessment.blocked,0);
+ for(const c of p.candidates){assert.equal(c.assessment.blocked,0);checkBoothRow(c.layout);}
 }
 assert(roomShapes.size>=3,'questions vary the room automatically');
 assert.deepEqual(generateReviewPair(source,21,'fixed').candidates[0].layout.outline,source.outline);
@@ -73,4 +91,4 @@ let attempts=0;const broken=new PairPrefetch(()=>({promise:Promise.reject(Error(
 await assert.rejects(broken.take(),/unavailable/);assert.equal(attempts,3,'generation errors retry automatically but stop at a bound');broken.dispose();
 let cancel=false,rejectPending;const cancelled=new PairPrefetch(()=>({promise:new Promise((_,reject)=>rejectPending=reject),cancel:()=>{cancel=true;rejectPending(Error('closed'));}}));
 const pending=cancelled.take();cancelled.dispose();await assert.rejects(pending);assert(cancel,'closing cancels the worker');
-console.log('PASS: bench-only result, varied/fixed rooms, 30 rapid answers, failed-candidate recovery, bounded prefetch, cancellation and one cumulative export. Pair times (ms): '+times.join(', '));
+console.log('PASS: back-to-back booth rows with continuous benches, varied/fixed rooms, 30 rapid answers, failed-candidate recovery, bounded prefetch, cancellation and one cumulative export. Pair times (ms): '+times.join(', '));

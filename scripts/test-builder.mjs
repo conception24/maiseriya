@@ -46,6 +46,27 @@ assert(diagonals>10);assert(maxBend<.15,`sharp bend ${maxBend}`);console.log('PA
 // A four-table bench run can either seat a group or offer three evenly spaced tables.
 const {banquetteRun}=await import(pathToFileURL(path.resolve('work/model-test/seating-rules.mjs')));
 const {rackOwner}=await import(pathToFileURL(path.resolve('work/model-test/table-arrangement.mjs')));
+// Utility tables persist as empty surfaces and are not robot dining targets.
+const utility={id:'utility',kind:'emptyTable',x:0,z:0,rotation:0};
+assert.equal(m.parseDocument(JSON.parse(JSON.stringify({version:2,...initial,items:[utility]}))).items[0].kind,'emptyTable');
+assert.equal(rackOwner(utility,[utility]),false);assert.equal(m.CATALOG.emptyTable.seats,0);
+assert.equal(createNavigator([utility],m.DEFAULT_OUTLINE,{x:0,z:4}).services.length,0);
+assert(m.placementError({...utility,id:'overlap-empty'},[utility]));
+// End screens bound the whole continuous sofa, in every orientation. Existing
+// side walls replace screens; a rear wall does not replace either end.
+const {benchEndPanels}=await import(pathToFileURL(path.resolve('work/model-test/seating-rules.mjs')));
+for(const rotation of [0,90,180,270]){
+ const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ const run=[{id:'left',kind:'bench',x:-.92*c,z:-.92*s,rotation},{id:'right',kind:'bench',x:.92*c,z:.92*s,rotation}];
+ const wall={id:'end',kind:'dividerWall',x:-1.99*c,z:-1.99*s,rotation:(rotation+90)%360};
+ assert.deepEqual(benchEndPanels(run,run,m.DEFAULT_OUTLINE),[-1,1]);
+ assert.deepEqual(benchEndPanels(run,[...run,wall],m.DEFAULT_OUTLINE),[1]);
+ const rear={...wall,x:-s*.48,z:c*.48,rotation};
+ assert.deepEqual(benchEndPanels(run,[...run,rear],m.DEFAULT_OUTLINE),[-1,1]);
+}
+const sideRoom=[{x:-1.94,z:-3},{x:4,z:-3},{x:4,z:3},{x:-1.94,z:3}];
+assert.deepEqual(benchEndPanels([{id:'at-wall',kind:'bench',x:-.92,z:0,rotation:0}],[],sideRoom),[1]);
+console.log('PASS: empty utility tables persist without menus/dining targets; continuous sofa ends reuse side walls in all rotations.');
 for(const rotation of [0,90,180,270]){
  const joined=banquetteRun('joined',0,0,rotation,[4]);const spaced=banquetteRun('spaced',0,0,rotation,[4],true);
  const jt=joined.items.filter(i=>i.kind==='table'),st=spaced.items.filter(i=>i.kind==='table');

@@ -1,7 +1,7 @@
 export const MAX_LAYOUT_ITEMS = 300;
 import {DEFAULT_OUTLINE,edges,entrance,rectInRoom,circleClear,outlineError,intersects,inside,type Point} from './geometry';
 export {DEFAULT_OUTLINE,edges,entrance,outlineError,area,inside,type Point} from './geometry';
-export type Kind = 'two' | 'four' | 'table' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool' | 'staffSink' | 'waitingStand';
+export type Kind = 'two' | 'four' | 'table' | 'emptyTable' | 'wideTable' | 'chair' | 'bench' | 'partition' | 'plant' | 'venus' | 'primavera' | 'cherubs' | 'robot' | 'adam' | 'annunciation' | 'athens' | 'logo' | 'checkout' | 'drinkbar' | 'serviceTable' | 'pillar' | 'dividerWall' | 'stool' | 'staffSink' | 'waitingStand';
 export type Item = {id:string;kind:Kind;x:number;z:number;rotation:number;side?:'inside'|'outside';mirror?:boolean;screen?:boolean;logoStyle?:'color'|'mono'|'letters'};
 export type Layout={items:Item[];outline:Point[];chairStyle:'woven'|'wovenDiamond'|'gray'|'perforated';foodEnabled?:boolean;drinkbarStyle?:'wood'|'tile';invertX?:boolean;invertY?:boolean};
 export const isArt=(kind:Kind)=>['venus','primavera','cherubs','adam','annunciation','athens','logo'].includes(kind);
@@ -13,6 +13,7 @@ export const CATALOG:Record<Kind,{name:string;description:string;w:number;d:numb
  two:{name:'2人席セット',description:'テーブル＋切替式チェア2脚',w:.86,d:1.95,seats:2},
  four:{name:'4人席セット',description:'テーブル＋クッション席2台',w:1.84,d:2.22,seats:4},
  table:{name:'小さなテーブル',description:'2人用・木目の天板',w:.82,d:.78,seats:0},
+ emptyTable:{name:'何もないテーブル',description:'食器の一時置き・荷物用。料理やメニューたては載りません',w:.82,d:.78,seats:0},
  wideTable:{name:'大きなテーブル',description:'4人用・木目の天板',w:1.53,d:.8,seats:0},
  chair:{name:'椅子',description:'籐編み / グレー2種類',w:.49,d:.5,seats:1},
  bench:{name:'長椅子',description:'つないで小テーブルと向かいの椅子を添えると「連続ベンチ席」になります',w:1.84,d:.66,seats:2},

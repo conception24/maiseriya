@@ -1,6 +1,6 @@
 import {CATALOG,isArt,type Kind} from './floor-plan';
-export function Furniture({kind,showRack=true,length=1.84}:{kind:Kind;showRack?:boolean;length?:number}) {
- const table=(wide=false)=><g><rect x={wide?-.765:-.41} y={-.39} width={wide?1.53:.82} height={.78} rx={.045} fill="#d5ad76" stroke="#8d673d" strokeWidth={.035}/><path d={wide?'M-.6,-.15 H.6 M-.6,.08 H.6':'M-.28,-.15 H.28 M-.28,.08 H.28'} stroke="#b68a56" strokeWidth={.018} opacity={.55}/>{showRack&&<rect x={wide?.48:.17} y={-.28} width={.18} height={.33} rx={.01} fill="#e8eee0" stroke="#4a925e" strokeWidth={.018}/>}</g>;
+export function Furniture({kind,showRack=true,length=1.84,endPanels=[]}:{kind:Kind;showRack?:boolean;length?:number;endPanels?:number[]}) {
+ const table=(wide=false)=><g><rect x={wide?-.765:-.41} y={-.39} width={wide?1.53:.82} height={.78} rx={.045} fill="#d5ad76" stroke="#8d673d" strokeWidth={.035}/><path d={wide?'M-.6,-.15 H.6 M-.6,.08 H.6':'M-.28,-.15 H.28 M-.28,.08 H.28'} stroke="#b68a56" strokeWidth={.018} opacity={.55}/>{showRack&&kind!=='emptyTable'&&<rect x={wide?.48:.17} y={-.28} width={.18} height={.33} rx={.01} fill="#e8eee0" stroke="#4a925e" strokeWidth={.018}/>}</g>;
  const chair=<g className="chair-glyph"><rect x={-.22} y={-.21} width={.44} height={.43} rx={.13} fill="#376347" stroke="#19472e" strokeWidth={.028}/><path d="M-.245,.01 Q-.28,.29 0,.28 Q.28,.29 .245,.01" fill="none" stroke="#b9945e" strokeWidth={.065}/></g>;
  const bench=<g><rect x={-(length-.02)/2} y={-.33} width={length-.02} height={.66} rx={.035} fill="#9c774a"/><rect x={-(length-.16)/2} y={-.28} width={length-.16} height={.43} rx={.05} fill="#356243" stroke="#214b31" strokeWidth={.025}/><rect x={-(length-.16)/2} y={.16} width={length-.16} height={.12} rx={.025} fill="#abb17a"/></g>;
  if(isArt(kind))return <g><rect x={-CATALOG[kind].w/2} y={-.06} width={CATALOG[kind].w} height={.12} fill="#ac8744" stroke="#634c28" strokeWidth=".025"/><path d={`M${-CATALOG[kind].w/2+.06},.07 H${CATALOG[kind].w/2-.06}`} stroke="#f2dda1" strokeWidth=".03"/></g>;
@@ -9,10 +9,10 @@ export function Furniture({kind,showRack=true,length=1.84}:{kind:Kind;showRack?:
  if(kind==='staffSink')return <g><rect x='-.29' y='-.21' width='.58' height='.42' rx='.05' fill='#eeeae0' stroke='#989e94' strokeWidth='.025'/><rect x='-.19' y='-.12' width='.38' height='.22' rx='.08' fill='#c7d5d0'/><circle cx='0' cy='.02' r='.03' fill='#87958e'/></g>;
  if(kind==='checkout')return <g><rect x="-.65" y="-.35" width="1.3" height=".7" rx=".04" fill="#53755a"/><rect x="-.35" y="-.25" width=".7" height=".4" fill="#f0ebd9"/><rect x="-.25" y="-.27" width=".5" height=".08" fill="#232c2a"/><text y=".27" textAnchor="middle" fontSize=".16" fill="white">レジ</text></g>;
  if(kind==='robot')return <g><circle r=".24" fill="#f7f6ee" stroke="#414d46" strokeWidth=".035"/><circle r=".2" fill="#39443d"/><rect x="-.1" y=".12" width=".2" height=".08" rx=".02" fill="#c8d1c8"/><circle cx="-.06" cy="-.04" r=".045" fill="#ded9bd"/></g>;
- if(kind==='table'||kind==='wideTable')return table(kind==='wideTable');
+ if(kind==='table'||kind==='wideTable'||kind==='emptyTable')return table(kind==='wideTable');
  if(kind==='stool')return <circle r='.2' fill='#d9b880' stroke='#ab8758' strokeWidth='.02'/>;
  if(kind==='waitingStand')return <g><rect x='-.3' y='-.23' width='.6' height='.46' rx='.025' fill='#9f7954'/><rect x='-.2' y='-.17' width='.4' height='.3' fill='#fff8e8'/><path d='M-.15,-.07 H.15 M-.15,0 H.15 M-.15,.07 H.15' stroke='#8d9189' strokeWidth='.015'/></g>;
- if(kind==='chair')return chair;if(kind==='bench')return bench;
+ if(kind==='chair')return chair;if(kind==='bench')return <g>{bench}{endPanels.map(side=><rect key={side} x={side*(length/2-.018)-.018} y={-.33} width={.036} height={.66} fill='#9b7447'/>)}</g>;
  if(kind==='two')return <g>{table()}<g transform="translate(0 .72)">{chair}</g><g transform="translate(0 -.72) rotate(180)">{chair}</g></g>;
  if(kind==='four')return <g>{table(true)}<g transform="translate(0 .78)">{bench}</g><g transform="translate(0 -.78) rotate(180)">{bench}</g></g>;
  if(kind==='pillar')return <g><rect x='-.41' y='-.41' width='.82' height='.82' fill='#cb995b' stroke='#a67b49' strokeWidth='.04'/><path d='M-.28,-.28 L.28,.28 M-.28,.28 L.28,-.28' stroke='#e1c393' strokeWidth='.025'/></g>;

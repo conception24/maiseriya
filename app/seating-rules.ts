@@ -31,6 +31,23 @@ export function continuousBenches(items:Item[]):Item[][]{
  }
  return runs;
 }
+// Short end partitions stay inside the sofa footprint: they bound the seat,
+// without turning its table-side access into a narrow enclosed passage.
+// Reuse a real wall/column/partition when it already covers that end.
+export function benchEndPanels(run:Item[],items:Item[],outline:Point[]):number[]{
+ if(!run.length)return[];
+ const first=run[0],a=first.rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ const us=run.map(i=>i.x*c+i.z*s),v=-first.x*s+first.z*c;
+ const structure=items.filter(i=>['partition','dividerWall','pillar'].includes(i.kind)).map(bounds);
+ return[-1,1].filter(side=>{
+  const u=(side<0?Math.min(...us):Math.max(...us))+side*(.92+.12);
+  const covered=[-.24,0,.24].every(offset=>{
+   const probe={x:c*u-s*(v+offset),z:s*u+c*(v+offset),w:.08,d:.08,rotation:first.rotation};
+   return !rectInRoom(probe,outline,0)||structure.some(r=>intersects(probe,r,.04));
+  });
+  return !covered;
+ });
+}
 export function smallTableGroups(items:Item[]):Item[][]{
  const remaining=new Set(items.filter(i=>i.kind==='table').map(i=>i.id)),tables=items.filter(i=>i.kind==='table'),groups:Item[][]=[];
  for(const first of tables){if(!remaining.delete(first.id))continue;const group=[first];
@@ -83,4 +100,3 @@ export function dividerSpan(item:Item,items:Item[]){
  const left=extension(-1),right=extension(1);
  return{width:half*2+left+right,offset:(right-left)/2};
 }
-

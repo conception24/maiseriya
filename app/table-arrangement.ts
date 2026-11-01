@@ -13,6 +13,7 @@ export function rackSide(item:Item,items:Item[],outline:Point[]):number {
 
 // Join only genuinely touching small tables; a gap remains a separate party.
 export function rackOwner(item:Item,items:Item[]):boolean {
+ if(item.kind==='emptyTable')return false;
  if(item.kind!=='table')return true;
  const group=[item],seen=new Set([item.id]),tables=items.filter(i=>i.kind==='table');
  for(let n=0;n<group.length;n++){
@@ -26,4 +27,3 @@ export function rackOwner(item:Item,items:Item[]):boolean {
  group.sort((x,y)=>(x.x*c+x.z*s)-(y.x*c+y.z*s)||x.id.localeCompare(y.id));
  return group[Math.floor((group.length-1)/2)].id===item.id;
 }
-

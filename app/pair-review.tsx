@@ -3,7 +3,7 @@ import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/u
 import {Furniture} from './furniture-glyph';
 import {entrance,spawnPoint,isArt,type Layout} from './floor-plan';
 import {createNavigator} from './robot-navigation';
-import {continuousBenches} from './seating-rules';
+import {continuousBenches,benchEndPanels} from './seating-rules';
 import {feedbackDocument,type LayoutPair,type PairAnswer,type PairRoomMode} from './pair-review-model';
 import {PairPrefetch,type PairQueueStatus} from './pair-prefetch';
 import PairWorker from './pair-worker?worker&inline';
@@ -15,7 +15,7 @@ function Plan({layout,label}:{layout:Layout;label:string}){
  return <svg role="img" aria-label={`${label}の平面図`} viewBox={`${Math.min(...xs)-.5} ${Math.min(...zs)-.5} ${Math.max(...xs)-Math.min(...xs)+1} ${Math.max(...zs)-Math.min(...zs)+1}`}>
   <polygon points={layout.outline.map(p=>`${p.x},${p.z}`).join(' ')} fill="#f1e7d1" stroke="#586d57" strokeWidth=".16"/>
   {layout.items.filter(i=>!isArt(i.kind)&&!['robot','bench'].includes(i.kind)).map(i=><g key={i.id} transform={`translate(${i.x} ${i.z}) rotate(${i.rotation})`}><Furniture kind={i.kind}/></g>)}
-  {runs.map(run=><g key={run[0].id} transform={`translate(${run.reduce((s,i)=>s+i.x,0)/run.length} ${run.reduce((s,i)=>s+i.z,0)/run.length}) rotate(${run[0].rotation})`}><Furniture kind="bench" length={run.length*1.84}/></g>)}
+  {runs.map(run=><g key={run[0].id} transform={`translate(${run.reduce((s,i)=>s+i.x,0)/run.length} ${run.reduce((s,i)=>s+i.z,0)/run.length}) rotate(${run[0].rotation})`}><Furniture kind="bench" length={run.length*1.84} endPanels={benchEndPanels(run,layout.items,layout.outline)}/></g>)}
   <circle cx={entry.x} cy={entry.z} r=".25" fill="#bd5533"/><text x={entry.x+entry.nx*.55} y={entry.z+entry.nz*.55} textAnchor="middle" fontSize=".38">入口</text>
   {[...nav.kitchens.map(k=>({...k,label:'厨房'})),...(nav.restroom?[{...nav.restroom,label:'WC'}]:[])].map(k=><text key={k.label+k.edge} x={k.door.x+k.nx*.5} y={k.door.z+k.nz*.5} textAnchor="middle" fontSize=".4" fill="#163d45">{k.label}</text>)}
  </svg>;

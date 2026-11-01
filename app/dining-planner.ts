@@ -184,6 +184,10 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  if(!corePlaced)throw new LayoutPlanningError('柱・連続ベンチ席・通路を一緒に確保できません。部屋の形状を広げてください。');
 
 
+ // Reserve a service station before optional perimeter seating consumes its approach.
+ placeSupplies(1);
+ if(!items.some(i=>i.kind==='serviceTable'))throw new LayoutPlanningError('調味料台と利用スペースを確保できませんでした。');
+
  // Reserve a connected booth row before benches consume every usable wall.
  for(const row of boothRows())if(commit(row)){boothWalls.add(row.edge);break;}
  // Match the walls that are actually rendered as windows, excluding service doors.
@@ -206,6 +210,8 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
  }
  function placeSupplies(limit:number){
  const supplies:Zone[]=[];
+ const availableWindows=windowOptions.filter(r=>![...occupied,...aisles].some(b=>intersects(r,b)));
+ const windowCost=(zone:Zone)=>availableWindows.filter(r=>[...zone.items.map(bounds),...zone.aisles].some(b=>intersects(r,b))).length*4;
  // The back edge of a service table meets a column, with its accessible face
  // pointing away from that column. Prefer these over ordinary wall positions.
  for(const pillar of items.filter(i=>i.kind==='pillar'))for(const rotation of[0,90,180,270]){
@@ -222,15 +228,13 @@ export function planDining(outline:Point[],fixtures:Item[],reserved:Rect[],rando
   const near=Math.min(...items.map(o=>Math.hypot(x-o.x,z-o.z)));
   const zone={items:[i],aisles:[front],score:-Math.abs(near-1.4)-Math.min(t,e.length-t)*.05};if(fits(zone))supplies.push(zone);
  }
- for(const zone of supplies.sort((a,b)=>b.score-a.score)){
+ for(const zone of supplies.sort((a,b)=>(b.score-windowCost(b))-(a.score-windowCost(a)))){
   if(items.filter(i=>i.kind==='serviceTable').length>=limit)break;
   if(items.some(i=>i.kind==='serviceTable'&&Math.hypot(i.x-zone.items[0].x,i.z-zone.items[0].z)<6))continue;
   commit(zone);
  }
  }
- // Reserve one usable supply station before optional seating rows consume pockets.
- placeSupplies(1);
- if(!items.some(i=>i.kind==='serviceTable'))throw new LayoutPlanningError('調味料台と利用スペースを確保できませんでした。');
+
 
  // Extend the seating architecture into large remaining wings before perimeter rows.
  // A bay always contains its fixed backing, benches, table group and a connected aisle.

@@ -120,3 +120,14 @@ export function entranceSeatExposed(seat:Item,all:Item[],outline:Point[]){
  const from={x:e.x+e.nx*.5,z:e.z+e.nz*.5};
  return !all.some(i=>i.id!==seat.id&&['partition','dividerWall','pillar','bench','four'].includes(i.kind)&&furnishingBlocksView(i,from,seat));
 }
+
+// Overflow waiting belongs immediately outside the entrance, along its facade.
+export function exteriorWaitingStools(items:Item[],outline:Point[]):Item[]{
+ const e=entrance(outline),result:Item[]=[],needed=Math.max(0,10-items.filter(i=>i.kind==='stool').length);
+ for(let offset=e.width/2+.6;offset<=4.2&&result.length<needed;offset+=.78)for(const side of[-1,1]){
+  if(result.length>=needed)break;
+  const item:Item={id:`waiting-outside-${result.length}`,kind:'stool',side:'outside',x:e.x+e.tx*offset*side-e.nx*.39,z:e.z+e.tz*offset*side-e.nz*.39,rotation:(e.angle+540)%360};
+  if(!placementError(item,[...items,...result],outline))result.push(item);
+ }
+ return result;
+}

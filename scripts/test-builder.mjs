@@ -25,7 +25,7 @@ const {createFleet}=await import(pathToFileURL(path.resolve('work/model-test/rob
 
 
 
-const {selectInBox,deleteSelection}=await import(pathToFileURL(path.resolve('work/model-test/edit-operations.mjs')));
+const {selectInBox,deleteSelection,translateSelection,selectionMoveError}=await import(pathToFileURL(path.resolve('work/model-test/edit-operations.mjs')));
 const editable=[{id:'a',kind:'table',x:0,z:0,rotation:0},{id:'b',kind:'partition',x:1,z:1,rotation:90},{id:'c',kind:'table',x:4,z:4,rotation:0}];
 const selected=selectInBox(editable,{x:2,z:2},{x:-1,z:-1});assert.deepEqual(selected,['a','b']);assert.deepEqual(deleteSelection(editable,selected).map(i=>i.id),['c']);assert.equal(editable.length,3);
 const warmed=createFleet(initial.items,initial.outline,24);assert(warmed.states().some(r=>Math.hypot(r.x-initial.items.find(i=>i.id===r.id).x,r.z-initial.items.find(i=>i.id===r.id).z)>.5));assert.equal(warmed.drainEvents().length,0);
@@ -75,3 +75,23 @@ assert(!checkoutNeedsScreen(wallCheckout,[wallCheckout],m.DEFAULT_OUTLINE),'wall
 const testScreen={id:'screen',kind:'partition',x:0,z:0,rotation:0};assert(screenBlocksView(testScreen,{x:0,z:2},{x:0,z:-2}));assert(!screenBlocksView(testScreen,{x:2,z:2},{x:2,z:-2}));
 assert(savedDefault.items.filter(i=>i.kind==='stool').length>=5,'initial waiting stools');assert(savedDefault.items.some(i=>i.kind==='waitingStand'),'initial waiting list stand');
 console.log('PASS: staff-side screen decisions, restroom line of sight, and initial waiting stools.');
+
+// A multi-item drag preserves relative positions and rejects an invalid group as a whole.
+const moveSource=[{id:'m1',kind:'table',x:-2,z:0,rotation:0},{id:'m2',kind:'table',x:0,z:0,rotation:0},{id:'fixed',kind:'table',x:3,z:0,rotation:0}];
+const movedGroup=translateSelection(moveSource,['m1','m2'],.6,1.1);
+assert.deepEqual(movedGroup.map(i=>[i.x,i.z]),[[-1.5,1],[.5,1],[3,0]]);
+assert.deepEqual(moveSource.map(i=>[i.x,i.z]),[[-2,0],[0,0],[3,0]]);
+assert.equal(selectionMoveError(movedGroup,['m1','m2'],m.DEFAULT_OUTLINE),null);
+assert(selectionMoveError(translateSelection(moveSource,['m1','m2'],3,0),['m1','m2'],m.DEFAULT_OUTLINE));
+assert(selectionMoveError(translateSelection(moveSource,['m1','m2'],8,0),['m1','m2'],m.DEFAULT_OUTLINE));
+const outsideStools=savedDefault.items.filter(i=>i.kind==='stool'&&i.side==='outside');
+assert(outsideStools.length>0);assert.equal(savedDefault.items.filter(i=>i.kind==='stool').length,10);
+const entry=m.entrance(savedDefault.outline);
+for(const stool of outsideStools){
+ assert.equal(m.placementError(stool,savedDefault.items,savedDefault.outline),null);
+ assert(Math.abs((stool.x-entry.x)*entry.nx+(stool.z-entry.z)*entry.nz+.39)<.001);
+ assert(m.placementError({...stool,x:stool.x+entry.nx,z:stool.z+entry.nz},savedDefault.items,savedDefault.outline));
+}
+assert.deepEqual(m.colliders(outsideStools),[]);
+assert(Math.abs(g.area(savedDefault.outline)-270)<.01);
+console.log('PASS: atomic group translation, collision/boundary rejection, 270m² initial plan, ten waiting stools with exterior facade seating.');

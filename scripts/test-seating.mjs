@@ -45,25 +45,25 @@ const exactTarget={x:5.15,z:-5.7},exactRoute=empty.route({x:0,z:5.75},exactTarge
 
 // Every generated footprint contains connected benches whose backs touch a wall
 // or the continuous wooden backing. No scoring preference may drop these seats.
+let calls=0;const hourglass=randomRoom(()=>[.4,.4,.99,.8][calls++]);
 const shapes=new Set();let rare=0;
 for(let n=0;n<1000;n++){
  const roll=(n+.5)/1000;let calls=0;
  const room=randomRoom(()=>[.4,.4,roll,.8][calls++]);shapes.add(JSON.stringify(room));
- if(room.length===12&&room.some(p=>p.z>10))rare++;
+ if(JSON.stringify(room)===JSON.stringify(hourglass))rare++;
 }
-assert.equal(shapes.size,17);assert.equal(rare,20,'hourglass occurs only 2% of the time');
-let calls=0;const hourglass=randomRoom(()=>[.4,.4,.99,.8][calls++]);
-assert(hourglass.some(p=>p.x===3.3)&&hourglass.some(p=>p.x===-3.3),'hourglass waist is 6.6m, three times the former 2.2m');
+assert.equal(shapes.size,24);assert.equal(rare,20,'hourglass occurs only 2% of the time');
+assert(Math.min(...hourglass.filter(p=>p.x>0).map(p=>p.x))*2>=6.6,'hourglass waist stays at least 6.6m wide');
 let totalRuns=0;
-for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
- let calls=0;const roll=shape===16?.99:(shape+.5)*.98/16;
+for(let shape=0;shape<24;shape++)for(const mirror of[.2,.8]){
+ let calls=0;const roll=shape===16?.99:((shape>16?shape-1:shape)+.5)*.98/23;
  const outline=randomRoom(()=>[.4,.4,roll,mirror][calls++]);
  const next=randomArrangement({...initialLayout(),outline},random);parseDocument({version:2,...next});
  const columns=next.items.filter(i=>i.kind==='pillar');assert(columns.length>=3&&columns.length<=4,`column count in shape ${shape}`);
  assert(columns.some(i=>i.mirror===true)&&columns.some(i=>i.mirror===false),'plain and mirror finishes both occur');
- const unique=(values)=>[...new Set(values.map(v=>v.toFixed(5)))];
+ const unique=(values)=>[...new Set(values.map(v=>Number(v.toFixed(5))))];
  const axesX=unique(columns.map(i=>i.x)),axesZ=unique(columns.map(i=>i.z));
- assert(axesX.length===1||axesZ.length===1||(axesX.length===2&&axesZ.length===2),'columns must form one line or an orthogonal L/rectangle');
+ assert(axesX.length===1||axesZ.length===1||(axesX.length===2&&axesZ.length===2),`columns must form one line or an orthogonal L/rectangle: shape ${shape}, mirror ${mirror}, ${JSON.stringify(columns.map(p=>[p.x,p.z]))}`);
  if(axesX.length===1||axesZ.length===1){const values=columns.map(i=>axesX.length===1?i.z:i.x).sort((a,b)=>a-b),pitch=values[1]-values[0];for(let n=2;n<values.length;n++)assert(Math.abs(values[n]-values[n-1]-pitch)<.001,'linear structural bays are evenly spaced');}
  for(const column of columns){
   assert(next.items.some(panel=>{
@@ -95,12 +95,12 @@ for(let shape=0;shape<17;shape++)for(const mirror of[.2,.8]){
  for(const g of smallTableGroups(next.items))assert(smallGroupAccess(g,nav));
 }
 assert(totalRuns>=60,'normally include multiple continuous bench runs');
-console.log(`PASS: 17 room families in both mirror directions, wall/partition backed connected benches in every plan (${totalRuns} runs), 2% wide-waisted hourglass.`);
+console.log(`PASS: 24 room families in both mirror directions, wall/partition backed connected benches in every plan (${totalRuns} runs), 2% wide-waisted hourglass.`);
 
 const badPillar={id:'bad-pillar',kind:'pillar',x:0,z:0,rotation:0,mirror:'yes'};
 assert.throws(()=>parseDocument({version:2,outline,items:[badPillar]}));
 assert.throws(()=>parseDocument({version:2,outline,items:[{...badPillar,kind:'chair',mirror:true}]}));
-console.log('PASS: 3–4 aligned interior columns in all 34 plans, uniformly spaced lines or orthogonal L/rectangles, attached partitions at every column, mixed finishes and validated persistence.');
+console.log('PASS: 3–4 aligned interior columns in all 48 plans, uniformly spaced lines or orthogonal L/rectangles, attached partitions at every column, mixed finishes and validated persistence.');
 
 // Fixed partitions are solid furniture, remain independent of thin movable boards,
 // and survive the same import/export and route validation as other items.

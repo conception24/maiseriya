@@ -12,9 +12,9 @@ const generate=ranked?(source,random)=>proposals(source,undefined,random)[0].lay
 const beforeGenerate=previous?(ranked?(source,random)=>previous.proposals(source,undefined,random)[0].layout:previous.randomArrangement):null;
 const rng=seed=>()=>((seed=seed*16807%2147483647)-1)/2147483646;
 const cases=[];
-for(let shape=-1;shape<17;shape++)for(const seed of[21,137]){
+for(let shape=-1;shape<24;shape++)for(const seed of[21,137]){
  if(ranked&&(seed!==21||![-1,1,3,5,6,16].includes(shape)))continue;
- let call=0;const roll=shape===16?.99:(shape+.5)*.98/16;
+ let call=0;const roll=shape===16?.99:((shape>16?shape-1:shape)+.5)*.98/23;
  const source={...initialLayout(),...(shape<0?{}:{outline:randomRoom(()=>[.4,.4,roll,.8][call++])})};
  cases.push({shape,seed,source});
 }

@@ -95,7 +95,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
    for(const edge of[-1,1]){box(.13,.25,.021,x+edge*(leaf/2-.12),2.36,.002,mat('#b42c31',.35),g);box(.018,2.43,.025,x+edge*(leaf/2-.19),1.35,0,leading,g);}
    for(const face of[-1,1]){cyl(.017,.017,.65,sign*.13,1.24,face*.10,mat('#c5c7bd',.24),g);for(const y of[.94,1.54])box(.035,.035,.10,sign*.13,y,face*.06,metal,g);}
   }
-  box(entry.width+.5,.035,2.4,0,-.01,-1.2,mat('#a6a396'),g);
+  box(e.length,.035,2.4,0,-.01,-1.2,mat('#a6a396'),g);
  }
 
  else if(isKitchen&&kitchen){const half=kitchen.width/2;const center=(kitchen.door.x-(e.a.x+e.b.x)/2)*e.tx+(kitchen.door.z-(e.a.z+e.b.z)/2)*e.tz;const left=center-half+e.length/2,right=e.length/2-center-half;for(const [w,cx] of [[left,-e.length/2+left/2],[right,e.length/2-right/2]])if(w>0){box(w,3.3,.18,cx,1.65,0,wall,g);box(w,.82,.1,cx,.41,.1,darkwood,g);}box(kitchen.width,1.05,.18,center,2.775,0,wall,g);for(const dx of[-half-.02,half+.02])box(.055,2.25,.2,center+dx,1.125,0,darkwood,g);box(kitchen.width+.06,.055,.2,center,2.25,0,darkwood,g);// Interior-only doorway backdrop: no black volume protrudes outside the room.
@@ -135,7 +135,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   }
  }
 
- else{box(e.length,3.3,.18,0,1.65,0,wall,g);box(e.length,.82,.1,0,.41,.1,darkwood,g);for(const y of[.12,.8,.9])box(e.length,.045,.12,0,y,.14,wood,g);for(let x=-e.length/2+.4;x<e.length/2;x+=.8)box(.025,.62,.04,x,.46,.16,wood,g);}
+ else{box(e.length,3.3,.18,0,1.65,0,wall,g);box(e.length,.82,.1,0,.41,.1,darkwood,g);for(const y of[.12,.8,.9])box(e.length,.045,.025,0,y,.10,wood,g);for(let x=-e.length/2+.4;x<e.length/2;x+=.8)box(.025,.62,.018,x,.46,.10,wood,g);}
  box(e.length,.1,.2,0,3.23,0,wood,g);
  }
  // A small recruitment notice on a solid wall near the self checkout.
@@ -350,7 +350,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   box(.57,.14,.07,0,.83,-.17,ceramic,g,.025);rod(new T.Vector3(.04,.86,-.15),new T.Vector3(.04,.86,-.02),.019,tap,g);
   cyl(.036,.036,.12,-.17,.91,-.12,soap,g);cyl(.037,.037,.018,-.17,.977,-.12,ceramic,g);
   box(.32,.18,.10,0,1.25,-.18,tap,g,.012);box(.27,.10,.005,0,1.25,-.123,ceramic,g);
-  const label=texture(c=>{c.fillStyle='#f6f6ef';c.fillRect(0,0,512,512);c.fillStyle='#202722';c.textAlign='center';c.font='bold 104px sans-serif';c.fillText('従業員専用',256,295);});const note=new T.Mesh(new T.PlaneGeometry(.27,.10),mat('#ffffff',.8,label));note.position.set(0,1.25,-.119);g.add(note);
+  const label=texture(c=>{c.fillStyle='#f6f6ef';c.fillRect(0,0,512,512);c.fillStyle='#202722';c.textAlign='center';c.scale(1,.27/.10);c.textBaseline='middle';c.font='bold 82px sans-serif';c.fillText('従業員専用',256,256/(.27/.10));});const note=new T.Mesh(new T.PlaneGeometry(.27,.10),mat('#ffffff',.8,label));note.position.set(0,1.25,-.119);g.add(note);
  }
  function serviceTable(g:T.Group){
   tableBody(0,0,.82,.78,g);
@@ -411,7 +411,7 @@ export function createRoom(host:HTMLDivElement,items:Item[],onPosition:((x:numbe
   box(.62,.55,.055,.05,1.49,-.12,black,g,.025);
   const screen=texture(c=>{c.fillStyle='#e6f3f1';c.fillRect(0,0,512,512);c.fillStyle='#169e83';c.fillRect(0,0,512,110);c.fillStyle='white';c.textAlign='center';c.font='bold 24px sans-serif';c.fillText('バーコードをかざしてください',256,65);for(const x of[145,365]){c.fillStyle='#343c42';c.fillRect(x-48,200,96,150);c.fillStyle='#b32420';c.fillRect(x-30,220,60,75);c.fillStyle='#eff5f1';c.fillRect(x-20,330,72,100);c.fillStyle='#202a28';for(let n=0;n<13;n++)c.fillRect(x-15+n*4,350,2,45);}c.fillStyle='#43534b';c.font='25px sans-serif';c.fillText('伝票用紙         スマホ画面',256,162);});
   const panel=new T.Mesh(new T.PlaneGeometry(.55,.46),mat('#ffffff',.5,screen));panel.position.set(.05,1.49,-.087);g.add(panel);
-  const label=texture(c=>{c.fillStyle='#252322';c.fillRect(0,0,512,512);c.fillStyle='#fff7dc';c.textAlign='center';c.font='bold 86px sans-serif';c.fillText('セルフレジ',256,250);c.font='38px sans-serif';c.fillText('Self Checkout',256,325);});const sign=new T.Mesh(new T.PlaneGeometry(.69,.21),mat('#ffffff',.6,label));sign.position.set(.05,1.85,-.08);g.add(sign);
+  const label=texture(c=>{c.fillStyle='#252322';c.fillRect(0,0,512,512);c.fillStyle='#fff7dc';c.textAlign='center';c.scale(1,.69/.21);c.textBaseline='middle';c.font='bold 78px sans-serif';c.fillText('セルフレジ',256,64);c.font='28px sans-serif';c.fillText('Self Checkout',256,120);});const sign=new T.Mesh(new T.PlaneGeometry(.69,.21),mat('#ffffff',.6,label));sign.position.set(.05,1.85,-.08);g.add(sign);
   box(.19,.18,.2,-.46,1.01,-.05,black,g,.012);box(.17,.25,.12,-.46,1.23,-.06,ivory,g,.018);box(.12,.16,.015,-.46,1.24,.008,black,g,.01);box(.09,.02,.018,-.46,1.3,.018,mat('#d93e32'),g);
   box(.22,.015,.18,-.15,1.198,.12,black,g,.015);box(.075,.17,.018,.23,1.02,.304,black,g,.008);box(.25,.10,.08,-.16,.98,.32,black,g,.025);box(.28,.025,.13,-.16,.925,.33,ivory,g,.02);
   const staffTerminal=box(.24,.17,.035,.25,1.18,-.31,black,g,.012);staffTerminal.rotation.x=-.18;box(.19,.115,.006,.25,1.19,-.333,mat('#315b60',.25),g,.004);

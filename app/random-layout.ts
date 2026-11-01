@@ -1,13 +1,13 @@
 import {planDining} from './dining-planner';
 import {CATALOG,isArt,bounds,placementError,spawnPoint,snapArt,edges,entrance,type Layout,type Item,type Point,type Kind} from './floor-plan';
-import {intersects} from './geometry';
+import {area,intersects} from './geometry';
 import {checkoutStaffArea} from './seating-rules';
 import {createNavigator} from './robot-navigation';
-import {checkoutNeedsScreen,waitingStools,chooseRestroomScreen} from './service-layout';
+import {checkoutNeedsScreen,waitingStools,exteriorWaitingStools,chooseRestroomScreen} from './service-layout';
 const planningNavigator=(items:Item[],outline:Point[],home:Point)=>createNavigator(items,outline,home,{services:false});
-// Sixteen everyday footprints, with a wide-waisted hourglass as a rare exception.
+// Varied connected wings, alcoves and stepped facades; the broad hourglass stays rare.
 export function randomRoom(random=Math.random):Point[]{
- const w=6.5+Math.floor(random()*5)*.5,d=7.5+Math.floor(random()*5)*.5,roll=random(),k=roll>=.98?16:Math.floor(roll/.98*16);
+ const w=6.5+Math.floor(random()*5)*.5,d=7.5+Math.floor(random()*5)*.5,roll=random(),k=roll>=.98?16:((n:number)=>n>=16?n+1:n)(Math.floor(roll/.98*23));
  const patterns:number[][][]=[
  [[-w,-d],[w,-d],[w,d],[-w,d]],
  [[-w+2,-d],[w-2,-d],[w,-d+2],[w,d-2],[w-2,d],[-w+2,d],[-w,d-2],[-w,-d+2]],
@@ -25,9 +25,21 @@ export function randomRoom(random=Math.random):Point[]{
  [[-w,-d],[w-2,-d],[w-2,-d+2],[w,-d+2],[w,d],[-w+2,d],[-w+2,d-2],[-w,d-2]],
  [[-w,-d],[1,-d],[1,-d+3],[w,-d+3],[w,d],[-1,d],[-1,d-3],[-w,d-3]],
  [[-w,-d],[w,-d],[w,d-4],[w-3,d-4],[w-3,d],[-w+3,d],[-w+3,d-4],[-w,d-4]],
- [[-w,-d],[w,-d],[w,-1],[3.3,-1],[3.3,2],[w,2],[w,d+3],[-w,d+3],[-w,2],[-3.3,2],[-3.3,-1],[-w,-1]]
+ [[-w,-d],[w,-d],[w,-1],[3.3,-1],[3.3,2],[w,2],[w,d+3],[-w,d+3],[-w,2],[-3.3,2],[-3.3,-1],[-w,-1]],
+ [[-w,-d],[w,-d],[w,-d+4],[w-2,-d+4],[w-2,d-3],[w,d-3],[w,d],[-w,d]],
+ [[-w,-d],[w-3,-d],[w-3,-4],[w,-4],[w,d],[-w+2,d],[-w+2,2],[-w,2]],
+ [[-w,-d],[w,-d],[w,-2],[w-2,-2],[w-2,2],[w,2],[w,d],[-w,d],[-w,3],[-w+2,3],[-w+2,-3],[-w,-3]],
+ [[-w,-d],[0,-d],[0,-d+2],[w,-d+2],[w,d],[-w,d]],
+ [[-w,-d],[w,-d],[w,d-2],[w-2,d],[-w,d],[-w,2],[-w+2,0],[-w+2,-4],[-w,-6]],
+ [[-w,-d],[w,-d],[w,-3],[w+2,-3],[w+2,3],[w,3],[w,d],[-w,d]],
+ [[-w,-d],[-3,-d],[-3,-d+2],[3,-d+2],[3,-d],[w,-d],[w,d],[2,d],[2,d-2],[-w,d-2]]
  ];
- let points=patterns[k].map(([x,z])=>({x,z}));if(random()<.5)points=points.map(p=>({x:-p.x,z:p.z})).reverse();return points;
+ let points=patterns[k].map(([x,z])=>({x,z}));
+ // Size the footprint, not the furniture or aisle widths. Keep the editor's bounds.
+ const target=270+(w-6.5)*30+(d-7.5)*15;
+ const scale=Math.min(Math.sqrt(target/area(points)),14/Math.max(...points.map(p=>Math.abs(p.x))),13/Math.max(...points.map(p=>Math.abs(p.z))));
+ points=points.map(p=>({x:Math.round(p.x*scale*4)/4,z:Math.round(p.z*scale*4)/4}));
+ if(random()<.5)points=points.map(p=>({x:-p.x,z:p.z})).reverse();return points;
 }
 export function randomArrangement(layout:Layout,random=Math.random):Layout{
  const outline=layout.outline,items:Item[]=[],entry=entrance(outline),xs=outline.map(p=>p.x),zs=outline.map(p=>p.z),minX=Math.min(...xs),maxX=Math.max(...xs),minZ=Math.min(...zs),maxZ=Math.max(...zs);let serial=0;let reserved:ReturnType<typeof bounds>[]=[];
@@ -100,7 +112,7 @@ export function randomArrangement(layout:Layout,random=Math.random):Layout{
   const art=snapArt({id:`random-${serial++}`,kind:artworks[Math.floor(random()*artworks.length)],x:e.a.x+t*e.tx,z:e.a.z+t*e.tz,rotation:0},outline);if(openings.some(k=>intersects(bounds(art),{x:k.door.x,z:k.door.z,w:k.width+.9,d:.8,rotation:edges(outline)[k.edge].angle})))continue;if(!behindBar(art)&&!placementError(art,items,outline))candidates.push(art);}
  const limit=Math.min(8,Math.max(3,Math.round(outline.reduce((sum,p,n)=>sum+Math.hypot(p.x-outline[(n+1)%outline.length].x,p.z-outline[(n+1)%outline.length].z),0)/14)));
  while(candidates.length&&items.filter(i=>isArt(i.kind)).length<limit){const art=candidates.splice(Math.floor(random()*candidates.length),1)[0];if(!placementError(art,items,outline))items.push(art);}
- return {...layout,items};
+ return {...layout,items:[...items,...exteriorWaitingStools(items,outline)]};
 }
 
 export {customerSeatAccess} from './seating-rules';

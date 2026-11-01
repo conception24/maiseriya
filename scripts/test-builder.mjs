@@ -3,6 +3,12 @@ const require=createRequire(path.resolve('package.json')),ts=require('typescript
 for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','service-layout','dining-planner','random-layout','table-arrangement','decor-placement','edit-operations','layout-review','review-prefetch','pair-review-model','pair-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
 const m=await import(pathToFileURL(path.resolve('work/model-test/floor-plan.mjs'))),g=await import(pathToFileURL(path.resolve('work/model-test/geometry.mjs'))),{createNavigator}=await import(pathToFileURL(path.resolve('work/model-test/robot-navigation.mjs')));
 const initial=m.initialLayout();assert.equal(m.parseDocument({version:2,...initial}).items.length,16);assert.equal(m.parseDocument({version:1,items:initial.items.filter(i=>!m.isArt(i.kind)&&i.kind!=='robot')}).chairStyle,'woven');
+// Larger hand-built restaurants must survive export/import beyond the former 150-item cap.
+const largeOutline=[{x:-14,z:-15},{x:14,z:-15},{x:14,z:13},{x:-14,z:13}];
+const largeItems=Array.from({length:300},(_,n)=>({id:`large-${n}`,kind:'chair',x:-12+(n%20)*1.2,z:-13+Math.floor(n/20)*1.2,rotation:0}));
+assert.equal(m.parseDocument(JSON.parse(JSON.stringify({version:2,...initial,outline:largeOutline,items:largeItems}))).items.length,300);
+assert.throws(()=>m.parseLayout([...largeItems,{id:'over-cap',kind:'chair',x:12,z:9,rotation:0}],largeOutline));
+console.log('PASS: 300-item layout export/import and excessive item count rejection.');
 assert.equal(m.parseDocument({version:1,items:[]}).foodEnabled,true);
 assert.equal(m.parseDocument(JSON.parse(JSON.stringify({version:2,...initial,foodEnabled:false}))).foodEnabled,false);
 assert.throws(()=>m.parseDocument({version:2,...initial,foodEnabled:'false'}));

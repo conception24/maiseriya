@@ -31,7 +31,7 @@ const {createFleet}=await import(pathToFileURL(path.resolve('work/model-test/rob
 
 
 
-const {selectInBox,deleteSelection,translateSelection,selectionMoveError}=await import(pathToFileURL(path.resolve('work/model-test/edit-operations.mjs')));
+const {selectInBox,deleteSelection,copySelection,translateSelection,selectionMoveError}=await import(pathToFileURL(path.resolve('work/model-test/edit-operations.mjs')));
 const editable=[{id:'a',kind:'table',x:0,z:0,rotation:0},{id:'b',kind:'partition',x:1,z:1,rotation:90},{id:'c',kind:'table',x:4,z:4,rotation:0}];
 const selected=selectInBox(editable,{x:2,z:2},{x:-1,z:-1});assert.deepEqual(selected,['a','b']);assert.deepEqual(deleteSelection(editable,selected).map(i=>i.id),['c']);assert.equal(editable.length,3);
 const warmed=createFleet(initial.items,initial.outline,24);assert(warmed.states().some(r=>Math.hypot(r.x-initial.items.find(i=>i.id===r.id).x,r.z-initial.items.find(i=>i.id===r.id).z)>.5));assert.equal(warmed.drainEvents().length,0);
@@ -111,6 +111,21 @@ assert.deepEqual(moveSource.map(i=>[i.x,i.z]),[[-2,0],[0,0],[3,0]]);
 assert.equal(selectionMoveError(movedGroup,['m1','m2'],m.DEFAULT_OUTLINE),null);
 assert(selectionMoveError(translateSelection(moveSource,['m1','m2'],3,0),['m1','m2'],m.DEFAULT_OUTLINE));
 assert(selectionMoveError(translateSelection(moveSource,['m1','m2'],8,0),['m1','m2'],m.DEFAULT_OUTLINE));
+// Copies retain source properties and relative placement, but never source IDs.
+let copyId=0;
+const copySource=moveSource.map((i,n)=>({...i,rotation:n===0?90:0,screen:true}));
+const copies=copySelection(copySource,['m1','m2'],()=>`copy-${++copyId}`),copyIds=copies.map(i=>i.id);
+assert.deepEqual(copyIds,['copy-1','copy-2']);
+assert.deepEqual(copies.map(({id,...rest})=>rest),copySource.slice(0,2).map(({id,...rest})=>rest));
+const copyBase=[...copySource,...copies],copyPreview=translateSelection(copyBase,copyIds,0,2.1);
+assert.deepEqual(copyPreview.slice(0,3),copySource,'originals stay in place');
+assert.deepEqual(copyPreview.slice(3).map(i=>[i.x,i.z,i.rotation]),[[-2,2,90],[0,2,0]]);
+assert.equal(selectionMoveError(copyPreview,copyIds,m.DEFAULT_OUTLINE),null);
+assert(selectionMoveError(copyBase,copyIds,m.DEFAULT_OUTLINE),'copy cannot overlap its originals');
+assert(selectionMoveError(translateSelection(copyBase,copyIds,3,0),copyIds,m.DEFAULT_OUTLINE),'one collision rejects whole copy');
+assert(selectionMoveError(translateSelection(copyBase,copyIds,10,0),copyIds,m.DEFAULT_OUTLINE),'outside room rejects whole copy');
+assert.deepEqual(translateSelection(copyBase,copyIds,0,0),copyBase,'no movement leaves gesture unchanged');
+console.log('PASS: group copying preserves originals, properties, spacing and stable unique IDs; invalid groups rejected.');
 const outsideStools=savedDefault.items.filter(i=>i.kind==='stool'&&i.side==='outside');
 assert(outsideStools.length>0);assert.equal(savedDefault.items.filter(i=>i.kind==='stool').length,10);
 const entry=m.entrance(savedDefault.outline);

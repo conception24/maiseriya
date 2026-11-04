@@ -7,3 +7,6 @@ export function deleteSelection(items:Item[],ids:string[]){const selected=new Se
 // Translate the selection as one rigid group, never snap its members independently.
 export function translateSelection(items:Item[],ids:string[],dx:number,dz:number){const selected=new Set(ids),x=snap(dx),z=snap(dz);return items.map(i=>selected.has(i.id)?{...i,x:i.x+x,z:i.z+z}:i);}
 export function selectionMoveError(items:Item[],ids:string[],outline:Point[]){const selected=new Set(ids);for(const i of items)if(selected.has(i.id)){const error=placementError(i,items,outline);if(error)return error;}return null;}
+
+// Allocate IDs once per gesture so copy previews and committed selection stay stable.
+export function copySelection(items:Item[],ids:string[],newId:()=>string=()=>crypto.randomUUID()){const selected=new Set(ids);return items.filter(i=>selected.has(i.id)).map(i=>({...i,id:newId()}));}

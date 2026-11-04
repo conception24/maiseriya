@@ -49,11 +49,11 @@ export default function HomePage(){
  const setSelected=(id:string|null)=>{setPrimary(id);setSelection(id?[id]:[]);};
  const svg=useRef<SVGSVGElement>(null),api=useRef<RoomAPI|null>(null),dragInfo=useRef<{source:Item;copy:boolean;dx:number;dz:number;next:Item;group?:string[];groupBase?:Item[];preview?:Item[]}|null>(null),fileInput=useRef<HTMLInputElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const notify=useCallback((message:string)=>{setNotice(message);if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>setNotice(''),3500);},[]);
- const onPosition=useCallback((p:{x:number;z:number;yaw:number})=>setPosition(p),[]),onWalkError=useCallback((message:string)=>setWalkError(message),[]);
+ const onPosition=useCallback((p:{x:number;z:number;yaw:number})=>setPosition(old=>old.x===p.x&&old.z===p.z&&old.yaw===p.yaw?old:p),[]),onWalkError=useCallback((message:string)=>setWalkError(message),[]);
  useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);generationWorker.current?.terminate();reviewQueue.current?.dispose();},[]);
  const commitLayout=useCallback((next:Layout)=>setHistory(h=>({past:[...h.past,h.present].slice(-50),present:next,future:[]})),[]);
  const commit=useCallback((next:Item[])=>commitLayout({...layout,items:next}),[layout,commitLayout]);
- const onRobot=useCallback((state:RobotState[])=>setRobotState(state),[]);
+ const onRobot=useCallback((state:RobotState[])=>setRobotState(old=>old.length===state.length&&old.every((r,n)=>r.id===state[n].id&&r.x===state[n].x&&r.z===state[n].z&&r.hidden===state[n].hidden&&r.status===state[n].status)?old:state),[]);
  const undo=useCallback(()=>{setHistory(h=>h.past.length?{past:h.past.slice(0,-1),present:h.past[h.past.length-1],future:[h.present,...h.future]}:h);setSelected(null);},[]);
  const redo=useCallback(()=>{setHistory(h=>h.future.length?{past:[...h.past,h.present],present:h.future[0],future:h.future.slice(1)}:h);setSelected(null);},[]);
  const active=items.find(i=>i.id===selected);const seats=items.reduce((n,i)=>n+CATALOG[i.kind].seats,0);

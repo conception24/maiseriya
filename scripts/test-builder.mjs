@@ -59,14 +59,14 @@ for(const rotation of [0,90,180,270]){
  const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
  const run=[{id:'left',kind:'bench',x:-.92*c,z:-.92*s,rotation},{id:'right',kind:'bench',x:.92*c,z:.92*s,rotation}];
  const wall={id:'end',kind:'dividerWall',x:-1.99*c,z:-1.99*s,rotation:(rotation+90)%360};
- assert.deepEqual(benchEndPanels(run,run,m.DEFAULT_OUTLINE),[-1,1]);
- assert.deepEqual(benchEndPanels(run,[...run,wall],m.DEFAULT_OUTLINE),[1]);
+ assert.deepEqual(benchEndPanels(run,run,m.DEFAULT_OUTLINE),[]);
+ assert.deepEqual(benchEndPanels(run,[...run,wall],m.DEFAULT_OUTLINE),[]);
  const rear={...wall,x:-s*.48,z:c*.48,rotation};
- assert.deepEqual(benchEndPanels(run,[...run,rear],m.DEFAULT_OUTLINE),[-1,1]);
+ assert.deepEqual(benchEndPanels(run,[...run,rear],m.DEFAULT_OUTLINE),[]);
 }
 const sideRoom=[{x:-1.94,z:-3},{x:4,z:-3},{x:4,z:3},{x:-1.94,z:3}];
-assert.deepEqual(benchEndPanels([{id:'at-wall',kind:'bench',x:-.92,z:0,rotation:0}],[],sideRoom),[1]);
-console.log('PASS: empty utility tables persist without menus/dining targets; continuous sofa ends reuse side walls in all rotations.');
+assert.deepEqual(benchEndPanels([{id:'at-wall',kind:'bench',x:-.92,z:0,rotation:0}],[],sideRoom),[]);
+console.log('PASS: empty utility tables persist without menus/dining targets; automatic sofa end panels disabled in all rotations.');
 for(const rotation of [0,90,180,270]){
  const joined=banquetteRun('joined',0,0,rotation,[4]);const spaced=banquetteRun('spaced',0,0,rotation,[4],true);
  const jt=joined.items.filter(i=>i.kind==='table'),st=spaced.items.filter(i=>i.kind==='table');

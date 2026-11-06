@@ -95,3 +95,6 @@
  .inspector-bottom,.file-actions {gap:6px}
  .finish-options button {min-height:82px}
 }
+
+.customize-bar .fleet-control{display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;font-size:.8rem;font-weight:600}
+.fleet-control select{font:inherit;color:inherit;background:#fff;border:1px solid #b8c5b7;border-radius:.4rem;padding:.35rem;cursor:pointer}

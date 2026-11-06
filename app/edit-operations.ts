@@ -13,7 +13,7 @@ export function copySelection(items:Item[],ids:string[],newId:()=>string=()=>cry
 
 export function trayOrigin(outline:Point[]):Point {
  const zs=outline.map(p=>p.z);
- return {x:Math.max(...outline.map(p=>p.x))+1, z:(Math.min(...zs)+Math.max(...zs)-TRAY_DEPTH)/2};
+ return {x:Math.max(...outline.map(p=>p.x))+2.6, z:(Math.min(...zs)+Math.max(...zs)-TRAY_DEPTH)/2};
 }
 
 export function onTray(item:Point,outline:Point[]) {

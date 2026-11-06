@@ -57,7 +57,11 @@ export function createNavigator(items:Item[],outline:Point[],home:Point,options:
   }
   line(turns[turns.length-1]);return result;
  }
- return{goals,services,kitchen,kitchens,restroom,aisleRoute:widePath,reachable:(p:Point,tolerance=.22)=>{for(let z=Math.ceil((p.z-tolerance)/step);z<=Math.floor((p.z+tolerance)/step);z++)for(let x=Math.ceil((p.x-tolerance)/step);x<=Math.floor((p.x+tolerance)/step);x++){const key=(z-minZ)*width+x-minX;if(x>=minX&&x<=maxX&&z>=minZ&&z<=maxZ&&component.has(key)&&Math.hypot(x*step-p.x,z*step-p.z)<=tolerance)return true;}return false;},route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked),path=trace(start,id(target),parents,first),end=path.at(-1)??start;
+ return{starts(count:number){
+  const points:Point[]=[];
+  for(const p of available){if(points.length>=count)break;if(points.every(q=>Math.hypot(q.x-p.x,q.z-p.z)>=1))points.push(p);}
+  return points;
+ },goals,services,kitchen,kitchens,restroom,aisleRoute:widePath,reachable:(p:Point,tolerance=.22)=>{for(let z=Math.ceil((p.z-tolerance)/step);z<=Math.floor((p.z+tolerance)/step);z++)for(let x=Math.ceil((p.x-tolerance)/step);x<=Math.floor((p.x+tolerance)/step);x++){const key=(z-minZ)*width+x-minX;if(x>=minX&&x<=maxX&&z>=minZ&&z<=maxZ&&component.has(key)&&Math.hypot(x*step-p.x,z*step-p.z)<=tolerance)return true;}return false;},route(start:Point,target:Point,blocked:Point[]=[]){const{parents,first}=search(start,blocked),path=trace(start,id(target),parents,first),end=path.at(-1)??start;
  // Portal coordinates need not fall on the navigation grid. Finish the safe
  // final centimetres, otherwise a robot can keep returning short of the door.
  if(parents.has(id(target))&&Math.hypot(target.x-end.x,target.z-end.z)>.00001&&swept(end,target)&&blocked.every(o=>[.25,.5,.75,1].every(t=>Math.hypot(end.x+(target.x-end.x)*t-o.x,end.z+(target.z-end.z)*t-o.z)>=.6)))path.push({...target});

@@ -2,8 +2,8 @@ import {createNavigator} from './robot-navigation';
 import {spawnPoint,type Item,type Point} from './floor-plan';
 export type RobotState=Point&{id:string;number:number;status:string;yaw:number;hidden:boolean;phase:string;cargo:'food'|'plates'|'empty';variant:number;tableId:string};
 export type ServiceEvent={type:'delivered'|'collected';tableId:string;variant:number};
-export function createFleet(items:Item[],outline:Point[],warmStartSeconds=0){
- const placed=items.filter(i=>i.kind==='robot'),first=placed[0],shared=createNavigator(items,outline,first??spawnPoint(outline,items)),kitchen=shared.kitchen,kitchens=shared.kitchens,portals=kitchens.map(()=>({owner:""}));
+export function createFleet(items:Item[],outline:Point[],warmStartSeconds=0,navigator?:ReturnType<typeof createNavigator>){
+ const placed=items.filter(i=>i.kind==='robot'),first=placed[0],shared=navigator??createNavigator(items,outline,first??spawnPoint(outline,items)),kitchen=shared.kitchen,kitchens=shared.kitchens,portals=kitchens.map(()=>({owner:""}));
  type Phase='outbound'|'service'|'return'|'enter'|'hidden'|'exit';
  const robots=placed.map((i,index)=>({kitchen:kitchens[index%kitchens.length]??null,portal:portals[index%portals.length]??{owner:""},id:i.id,number:index+1,x:i.x,z:i.z,yaw:-i.rotation*Math.PI/180,status:'出発準備中',nav:shared,path:[] as Point[],wait:index*.4,blocked:0,idle:0,lastX:i.x,lastZ:i.z,yielding:false,goalIndex:index,target:{x:i.x,z:i.z},home:{x:i.x,z:i.z},phase:'outbound' as Phase,hidden:false,cargo:'food' as RobotState['cargo'],variant:index,tableId:'',collect:false}));
  const events:ServiceEvent[]=[];

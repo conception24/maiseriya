@@ -2,7 +2,7 @@ import fs from 'node:fs';import path from 'node:path';import {createRequire} fro
 const require=createRequire(path.resolve('package.json')),ts=require('typescript');fs.mkdirSync('work/model-test',{recursive:true});
 for(const name of['geometry','floor-plan','robot-navigation','robot-fleet','seating-rules','layout-quality','service-layout','dining-planner','random-layout','table-arrangement','decor-placement','edit-operations','layout-review','review-prefetch','pair-review-model','pair-prefetch']){const source=fs.readFileSync(`app/${name}.ts`,'utf8'),js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.+?)'/g,"from '$1.mjs'");fs.writeFileSync(`work/model-test/${name}.mjs`,js);}
 const m=await import(pathToFileURL(path.resolve('work/model-test/floor-plan.mjs'))),g=await import(pathToFileURL(path.resolve('work/model-test/geometry.mjs'))),{createNavigator}=await import(pathToFileURL(path.resolve('work/model-test/robot-navigation.mjs')));
-const initial=m.initialLayout();assert.equal(m.parseDocument({version:2,...initial}).items.length,16);assert.equal(m.parseDocument({version:1,items:initial.items.filter(i=>!m.isArt(i.kind)&&i.kind!=='robot')}).chairStyle,'woven');
+const initial=m.initialLayout();assert.equal(m.parseDocument({version:2,...initial}).items.length,initial.items.filter(i=>i.kind!=='robot').length);assert.equal(m.parseDocument({version:1,items:initial.items.filter(i=>!m.isArt(i.kind)&&i.kind!=='robot')}).chairStyle,'woven');
 // Larger hand-built restaurants must survive export/import beyond the former 150-item cap.
 const largeOutline=[{x:-14,z:-15},{x:14,z:-15},{x:14,z:13},{x:-14,z:13}];
 const largeItems=Array.from({length:300},(_,n)=>({id:`large-${n}`,kind:'chair',x:-12+(n%20)*1.2,z:-13+Math.floor(n/20)*1.2,rotation:0}));
@@ -74,7 +74,7 @@ for(const rotation of [0,90,180,270]){
  assert(Math.abs(Math.hypot(st[1].x-st[0].x,st[1].z-st[0].z)-Math.hypot(st[2].x-st[1].x,st[2].z-st[1].z))<1e-8);
  assert.equal(jt.filter(i=>rackOwner(i,joined.items)).length,1);assert.equal(st.filter(i=>rackOwner(i,spaced.items)).length,3);
 }
-const savedDefault=JSON.parse(fs.readFileSync('app/default-layout.json','utf8'));assert(savedDefault.items.some(i=>i.kind==='bench'));assert(savedDefault.items.some(i=>i.kind==='checkout'));assert.equal(savedDefault.items.filter(i=>i.kind==='robot').length,3);assert.equal(m.parseDocument({version:2,...savedDefault}).items.length,savedDefault.items.length);
+const savedDefault=JSON.parse(fs.readFileSync('app/default-layout.json','utf8'));assert(savedDefault.items.some(i=>i.kind==='bench'));assert(savedDefault.items.some(i=>i.kind==='checkout'));assert.equal(savedDefault.items.filter(i=>i.kind==='robot').length,3);assert.equal(m.parseDocument({version:2,...savedDefault}).items.length,savedDefault.items.filter(i=>i.kind!=='robot').length);
 console.log('PASS: joined and spaced bench tables, one rack per joined group, new initial layout round-trip.');
 
 const {continuousBenches}=await import(pathToFileURL(path.resolve('work/model-test/seating-rules.mjs')));
@@ -92,9 +92,9 @@ const basin=savedDefault.items.find(i=>i.kind==='staffSink');assert(basin,'defau
 const defaultNav=createNavigator(savedDefault.items,savedDefault.outline,m.spawnPoint(savedDefault.outline,savedDefault.items));assert(Math.hypot(basin.x-defaultNav.kitchens[0].door.x,basin.z-defaultNav.kitchens[0].door.z)<2.5);assert(defaultNav.kitchens.every(k=>defaultNav.reachable(k.point,.35)));assert(!m.canWalk(basin.x,basin.z,m.colliders(savedDefault.items),savedDefault.outline,.2));
 console.log('PASS: default kitchen hand basin is placed near its doorway, blocks movement, and leaves the kitchen accessible.');
 
-assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'wovenDiamond'}).chairStyle,'wovenDiamond');
+assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'wovenDiamond'}).chairStyle,'woven');
 assert.equal(m.parseDocument({version:2,...savedDefault,chairStyle:'woven'}).chairStyle,'woven');
-console.log('PASS: both woven chair patterns survive layout export and import.');
+console.log('PASS: woven chairs import and discontinued diamond patterns migrate.');
 
 const {checkoutNeedsScreen,screenBlocksView}=await import(pathToFileURL(path.resolve('work/model-test/service-layout.mjs')));
 const wallCheckout={id:'register-wall',kind:'checkout',x:0,z:-7.45,rotation:0},openCheckout={...wallCheckout,id:'register-open',z:0};
@@ -123,8 +123,8 @@ assert.deepEqual(copyPreview.slice(3).map(i=>[i.x,i.z,i.rotation]),[[-2,2,90],[0
 assert.equal(selectionMoveError(copyPreview,copyIds,m.DEFAULT_OUTLINE),null);
 assert(selectionMoveError(copyBase,copyIds,m.DEFAULT_OUTLINE),'copy cannot overlap its originals');
 assert(selectionMoveError(translateSelection(copyBase,copyIds,3,0),copyIds,m.DEFAULT_OUTLINE),'one collision rejects whole copy');
-assert.equal(selectionMoveError(translateSelection(copyBase,copyIds,10,0),copyIds,m.DEFAULT_OUTLINE),null,'copies can be parked in the tray');
-assert(selectionMoveError(translateSelection(copyBase,copyIds,16,0),copyIds,m.DEFAULT_OUTLINE),'beyond the tray rejects the whole copy');
+assert.equal(selectionMoveError(translateSelection(copyBase,copyIds,13,0),copyIds,m.DEFAULT_OUTLINE),null,'copies can be parked in the tray');
+assert(selectionMoveError(translateSelection(copyBase,copyIds,25,0),copyIds,m.DEFAULT_OUTLINE),'beyond the tray rejects the whole copy');
 assert.deepEqual(translateSelection(copyBase,copyIds,0,0),copyBase,'no movement leaves gesture unchanged');
 console.log('PASS: group copying preserves originals, properties, spacing and stable unique IDs; invalid groups rejected.');
 const outsideStools=savedDefault.items.filter(i=>i.kind==='stool'&&i.side==='outside');
@@ -151,7 +151,7 @@ const sample=savedDefault, origin=editor.trayOrigin(sample.outline);
 const parked={id:'spare',kind:'chair',x:origin.x+1,z:origin.z+1,rotation:0};
 const split=editor.splitEditorItems([...sample.items,parked],sample.outline);
 const loaded=m.parseDocument({version:2,...sample,...split});
-assert.deepEqual(loaded.items,sample.items);
+assert.deepEqual(loaded.items,sample.items.filter(i=>i.kind!=='robot'));
 assert.deepEqual(loaded.staged,[{...parked,x:1,z:1}]);
 assert.throws(()=>m.parseDocument({version:2,...sample,staged:[{...loaded.staged[0],id:sample.items[0].id}]}));
 const outside=outsideStools[0];
@@ -161,3 +161,7 @@ const parkedArt=editor.snapForEditor({...parked,kind:'venus'},sample.items,sampl
 assert(editor.onTray(parkedArt,sample.outline));
 assert.equal(editor.editorPlacementError(parkedArt,sample.items,sample.outline),null);
 console.log('PASS: group rotation and collisions, staging round trip including separate exterior stools and artwork.');
+
+assert.equal(m.TRAY_WIDTH*m.TRAY_DEPTH,240);
+for(const count of [0,1,3,5]) assert.equal(m.parseDocument({version:2,...savedDefault,robotCount:count}).robotCount,count);
+assert.throws(()=>m.parseDocument({version:2,...savedDefault,robotCount:6}));

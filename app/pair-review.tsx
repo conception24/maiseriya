@@ -1,3 +1,4 @@
+import {PlanDoor} from './plan-door';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {Furniture} from './furniture-glyph';
@@ -12,18 +13,16 @@ function Plan({layout,label}:{layout:Layout;label:string}){
  const nav=useMemo(()=>createNavigator(layout.items,layout.outline,spawnPoint(layout.outline,layout.items),{services:false}),[layout]);
  const runs=useMemo(()=>continuousBenches(layout.items),[layout]);
  const xs=layout.outline.map(p=>p.x),zs=layout.outline.map(p=>p.z),entry=entrance(layout.outline);
- return <svg role="img" aria-label={`${label}の平面図`} viewBox={`${Math.min(...xs)-.5} ${Math.min(...zs)-.5} ${Math.max(...xs)-Math.min(...xs)+1} ${Math.max(...zs)-Math.min(...zs)+1}`}>
+ return <svg role="img" aria-label={`${label}の平面図`} viewBox={`${Math.min(...xs)-2.4} ${Math.min(...zs)-1.3} ${Math.max(...xs)-Math.min(...xs)+4.8} ${Math.max(...zs)-Math.min(...zs)+2.6}`}>
   <polygon points={layout.outline.map(p=>`${p.x},${p.z}`).join(' ')} fill="#f1e7d1" stroke="#586d57" strokeWidth=".16"/>
   {layout.items.filter(i=>!isArt(i.kind)&&!['robot','bench'].includes(i.kind)).map(i=><g key={i.id} transform={`translate(${i.x} ${i.z}) rotate(${i.rotation})`}><Furniture kind={i.kind}/></g>)}
   {runs.map(run=><g key={run[0].id} transform={`translate(${run.reduce((s,i)=>s+i.x,0)/run.length} ${run.reduce((s,i)=>s+i.z,0)/run.length}) rotate(${run[0].rotation})`}><Furniture kind="bench" length={run.length*1.84} endPanels={benchEndPanels(run,layout.items,layout.outline)}/></g>)}
-  <circle cx={entry.x} cy={entry.z} r=".25" fill="#bd5533"/><text x={entry.x+entry.nx*.55} y={entry.z+entry.nz*.55} textAnchor="middle" fontSize=".38">入口</text>
-  {[...nav.kitchens.map(k=>({...k,label:'厨房'})),...(nav.restroom?[{...nav.restroom,label:'WC'}]:[])].map(k=><text key={k.label+k.edge} x={k.door.x+k.nx*.5} y={k.door.z+k.nz*.5} textAnchor="middle" fontSize=".4" fill="#163d45">{k.label}</text>)}
- </svg>;
+  <PlanDoor point={entry} nx={entry.nx} nz={entry.nz} width={entry.width} label="入口" color="#336547"/>{nav.kitchens.map((k,n)=><PlanDoor key={k.edge} point={k.door} nx={k.nx} nz={k.nz} width={k.width} label={nav.kitchens.length>1?`厨房 ${n+1}`:"厨房"} color="#265969"/>)}{nav.restroom&&<PlanDoor point={nav.restroom.door} nx={nav.restroom.nx} nz={nav.restroom.nz} width={.95} label="WC" color="#744867"/>}</svg>;
 }
 function PairWalk({layout}:{layout:Layout}){
  const host=useRef<HTMLDivElement>(null),[error,setError]=useState('');
  useEffect(()=>{let cancelled=false,dispose:(()=>void)|undefined;
-  import('./room').then(({createRoom})=>{if(cancelled||!host.current)return;const api=createRoom(host.current,layout.items,()=>{},{outline:layout.outline,chairStyle:layout.chairStyle,foodEnabled:layout.foodEnabled,drinkbarStyle:layout.drinkbarStyle,invertX:layout.invertX,invertY:layout.invertY});dispose=()=>api.dispose();}).catch(()=>{if(!cancelled)setError('3Dを表示できませんでした。平面図で比較できます。');});
+  import('./room').then(({createRoom})=>{if(cancelled||!host.current)return;const api=createRoom(host.current,layout.items,()=>{},{outline:layout.outline,chairStyle:layout.chairStyle,foodEnabled:layout.foodEnabled,drinkbarStyle:layout.drinkbarStyle,invertX:layout.invertX,invertY:layout.invertY,robotCount:layout.robotCount});dispose=()=>api.dispose();}).catch(()=>{if(!cancelled)setError('3Dを表示できませんでした。平面図で比較できます。');});
   return()=>{cancelled=true;dispose?.();};
  },[layout]);
  return <><p>ドラッグで見回す・WASD / 矢印キーで歩く</p><div className="pair-walk" ref={host}/>{error&&<p role="alert">{error}</p>}</>;

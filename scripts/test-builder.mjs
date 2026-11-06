@@ -123,7 +123,8 @@ assert.deepEqual(copyPreview.slice(3).map(i=>[i.x,i.z,i.rotation]),[[-2,2,90],[0
 assert.equal(selectionMoveError(copyPreview,copyIds,m.DEFAULT_OUTLINE),null);
 assert(selectionMoveError(copyBase,copyIds,m.DEFAULT_OUTLINE),'copy cannot overlap its originals');
 assert(selectionMoveError(translateSelection(copyBase,copyIds,3,0),copyIds,m.DEFAULT_OUTLINE),'one collision rejects whole copy');
-assert(selectionMoveError(translateSelection(copyBase,copyIds,10,0),copyIds,m.DEFAULT_OUTLINE),'outside room rejects whole copy');
+assert.equal(selectionMoveError(translateSelection(copyBase,copyIds,10,0),copyIds,m.DEFAULT_OUTLINE),null,'copies can be parked in the tray');
+assert(selectionMoveError(translateSelection(copyBase,copyIds,16,0),copyIds,m.DEFAULT_OUTLINE),'beyond the tray rejects the whole copy');
 assert.deepEqual(translateSelection(copyBase,copyIds,0,0),copyBase,'no movement leaves gesture unchanged');
 console.log('PASS: group copying preserves originals, properties, spacing and stable unique IDs; invalid groups rejected.');
 const outsideStools=savedDefault.items.filter(i=>i.kind==='stool'&&i.side==='outside');
@@ -137,3 +138,26 @@ for(const stool of outsideStools){
 assert.deepEqual(m.colliders(outsideStools),[]);
 assert(Math.abs(g.area(savedDefault.outline)-270)<.01);
 console.log('PASS: atomic group translation, collision/boundary rejection, 270m² initial plan, ten waiting stools with exterior facade seating.');
+
+const editor=await import(pathToFileURL(path.resolve('work/model-test/edit-operations.mjs')));
+const ids=['m1','m2'];
+let turned=editor.rotateSelection(moveSource,ids);
+assert.deepEqual(turned.map(i=>[i.x,i.z,i.rotation]),[[-1,-1,90],[-1,1,90],[3,0,0]]);
+assert.equal(selectionMoveError(turned,ids,m.DEFAULT_OUTLINE),null);
+assert(selectionMoveError([...turned,{id:'obstacle',kind:'bench',x:-1,z:-1,rotation:0}],ids,m.DEFAULT_OUTLINE));
+for(let i=0;i<3;i++)turned=editor.rotateSelection(turned,ids);
+assert.deepEqual(turned,moveSource);
+const sample=savedDefault, origin=editor.trayOrigin(sample.outline);
+const parked={id:'spare',kind:'chair',x:origin.x+1,z:origin.z+1,rotation:0};
+const split=editor.splitEditorItems([...sample.items,parked],sample.outline);
+const loaded=m.parseDocument({version:2,...sample,...split});
+assert.deepEqual(loaded.items,sample.items);
+assert.deepEqual(loaded.staged,[{...parked,x:1,z:1}]);
+assert.throws(()=>m.parseDocument({version:2,...sample,staged:[{...loaded.staged[0],id:sample.items[0].id}]}));
+const outside=outsideStools[0];
+assert.equal(editor.editorPlacementError(outside,sample.items,sample.outline),null);
+assert.equal(editor.snapForEditor({...outside,x:0,z:0},[],sample.outline).side,undefined);
+const parkedArt=editor.snapForEditor({...parked,kind:'venus'},sample.items,sample.outline);
+assert(editor.onTray(parkedArt,sample.outline));
+assert.equal(editor.editorPlacementError(parkedArt,sample.items,sample.outline),null);
+console.log('PASS: group rotation and collisions, staging round trip including separate exterior stools and artwork.');

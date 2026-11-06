@@ -43,3 +43,55 @@
 .catalog-category select:focus-visible{outline:3px solid #a5b66d;outline-offset:2px}
 .catalog-list{min-height:0;overflow-y:auto;align-content:start;flex:1;padding:2px}.catalog-foot{flex-shrink:0;padding-top:12px}
 @media(max-width:600px){.editor-layout{grid-template-rows:142px minmax(0,1fr) 80px}.catalog{display:grid;grid-template-columns:60px minmax(0,1fr);grid-template-rows:38px minmax(0,1fr);gap:7px;overflow:hidden}.catalog-category{grid-column:1/-1;flex-direction:row;align-items:center;gap:8px;margin:0;font-size:11px;white-space:nowrap}.catalog-category select{flex:1;width:auto;padding:7px 8px}.catalog .select-tool{grid-column:1;grid-row:2}.catalog-list{grid-column:2;grid-row:2;overflow-x:auto;overflow-y:hidden;padding:0 0 3px}.catalog-item{flex-shrink:0}}
+
+/* Keep editing tools together and leave the plan its full height. */
+.editor-layout {grid-template-columns:clamp(255px,24vw,350px) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+.catalog {grid-column:1;grid-row:1 / 3;padding:16px;gap:8px}
+.catalog h2 {margin:0 0 4px 2px}
+.catalog .section-label {margin-left:2px}
+.category-tiles {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;flex-shrink:0}
+.category-tiles button,.finish-options button {display:flex;align-items:center;justify-content:center;flex-direction:column;background:#f2f4eb;border:1px solid #d2dbc9;border-radius:8px;gap:5px}
+.category-tiles button {min-height:55px;padding:6px 2px;color:#48654f;font-size:11px;font-weight:600}
+.category-tiles button[aria-pressed=true],.finish-options button[aria-pressed=true] {background:#dcebd9;border-color:#48734e;color:#1a442c;box-shadow:inset 0 0 0 1px #48734e}
+.catalog-item small {white-space:normal;line-height:1.4}
+.select-tool {margin:0}
+.catalog>.detail {flex:none;max-height:36%;overflow:auto;border-top:1px solid #dce1d3;padding:8px 2px 0}
+.catalog>.detail .furniture-icon,.catalog>.detail .pill {display:none}
+.catalog>.detail p {font-size:11px;margin:3px 0 6px}
+.catalog>.detail .nudge {margin:6px}
+.catalog>.detail .outline-button {margin:3px 0}
+.plan-area {grid-column:2;grid-row:1;min-width:0}
+.inspector {grid-column:2;grid-row:2;display:flex;flex-direction:row;align-items:center;gap:16px;height:auto;padding:8px 16px;border:0;border-top:1px solid #dce1d1}
+.inspector>.section-label {display:none}
+.inspector .stats,.inspector-bottom,.file-actions {display:flex;align-items:center;margin:0;padding:0;gap:12px}
+.inspector .stats div {display:flex;align-items:baseline;flex-direction:row;gap:3px}
+.inspector .stats strong {font-size:20px}
+.inspector-bottom {margin-left:auto}
+.inspector .file-actions {display:flex}
+.inspector .enter-button {width:auto;padding:9px 12px}
+.finish-dialog {max-width:min(440px,94vw);background:#fffef8}
+.finish-options {display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.finish-options button {padding:8px;font-size:13px}
+.finish-options svg {width:100%;height:94px}
+@media(max-width:900px) {
+ .editor-layout {grid-template-columns:210px minmax(0,1fr)}
+ .catalog {padding:10px}
+ .catalog>.detail {display:block}
+ .inspector {flex-wrap:wrap;gap:5px}
+}
+@media(max-width:600px) {
+ .editor-layout {grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto}
+ .catalog {display:grid;grid-column:1;grid-row:1;grid-template-columns:54px minmax(0,1fr);grid-template-rows:auto 60px;gap:5px;padding:5px 8px}
+ .category-tiles {grid-column:1/-1;grid-row:1;display:flex;overflow-x:auto}
+ .category-tiles button {flex:1 0 48px;min-height:46px;font-size:9px;gap:1px}
+ .category-tiles svg {width:20px;height:20px}
+ .catalog-item {width:80px;min-width:80px;min-height:52px}
+ .catalog-item>.furniture-icon {height:34px}
+ .catalog>.detail {grid-column:1/-1;max-height:72px;overflow:auto;display:flex;align-items:center;gap:6px;padding:2px}
+ .catalog>.detail>* {flex-shrink:0}
+ .plan-area {grid-column:1;grid-row:2}
+ .inspector {grid-column:1;grid-row:3;padding:5px 8px}
+ .inspector .stats>div:last-child {display:flex}
+ .inspector-bottom,.file-actions {gap:6px}
+ .finish-options button {min-height:82px}
+}
